@@ -7,7 +7,7 @@ import { NotificationsModule } from './notifications/notifications.module';
 import { PaymentsModule } from './payments/payments.module';
 import { LabModule } from './lab/lab.module';
 import { PatientsModule } from './patients/patients.module';
-import { AuditlogsModule } from './auditlogs/auditlogs.module';
+import { AuditlogsModule } from './auditLogs/auditlogs.module';
 import { InventoryModule } from './inventory/inventory.module';
 import { AnalyticsModule } from './analytics/analytics.module';
 import { TraigeModule } from './traige/traige.module';
