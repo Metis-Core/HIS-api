@@ -1,26 +1,58 @@
-import { Injectable } from '@nestjs/common';
-import { CreateAuthDto } from './dto/create-auth.dto';
-import { UpdateAuthDto } from './dto/update-auth.dto';
+import {
+  Injectable,
+  UnauthorizedException,
+  ForbiddenException,
+} from '@nestjs/common';
+import * as argon2 from 'argon2';
+import { JwtService } from '@nestjs/jwt';
+import { AccountStatus } from 'common/enums/userStatus.enum';
+import { UsersService } from 'src/users/users.service';
+import { User } from 'src/users/entities/user.entity';
+import { LoginDto } from './dto/login.dto';
 
 @Injectable()
 export class AuthService {
-  create(createAuthDto: CreateAuthDto) {
-    return 'This action adds a new auth';
+  constructor(
+    private usersService: UsersService,
+    private jwtService: JwtService,
+  ) {}
+
+  async validateUserCredentials(dto: LoginDto) {
+    const user = await this.usersService.findByEmailOrUsername(dto.identifier);
+    if (!user) {
+      throw new UnauthorizedException('Invalid credentials');
+    }
+
+    const isPasswordValid = await argon2.verify(
+      user.passwordHash,
+      dto.password,
+    );
+    if (!isPasswordValid) {
+      throw new UnauthorizedException('Invalid credentials');
+    }
+
+    if (
+      user.status === AccountStatus.SUSPENDED ||
+      user.status === AccountStatus.INACTIVE
+    ) {
+      throw new ForbiddenException('Your account is inactive or suspended.');
+    }
+
+    return user;
   }
 
-  findAll() {
-    return `This action returns all auth`;
-  }
+  async login(user: User) {
+    const payload = {
+      sub: user.id,
+      email: user.email,
+      role: user.role,
+      department: user.department,
+      status: user.status,
+    };
 
-  findOne(id: number) {
-    return `This action returns a #${id} auth`;
-  }
-
-  update(id: number, updateAuthDto: UpdateAuthDto) {
-    return `This action updates a #${id} auth`;
-  }
-
-  remove(id: number) {
-    return `This action removes a #${id} auth`;
+    return {
+      accessToken: await this.jwtService.signAsync(payload),
+      mustResetPassword: user.status === AccountStatus.PENDING_RESET,
+    };
   }
 }

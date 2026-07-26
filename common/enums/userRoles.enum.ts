@@ -1,4 +1,5 @@
 export enum UserRole {
+  SUPER_ADMIN = 'SUPER_ADMIN',
   ADMIN = 'ADMIN',
   DOCTOR = 'DOCTOR',
   NURSE = 'NURSE',
@@ -6,4 +7,5 @@ export enum UserRole {
   PHARMACIST = 'PHARMACIST',
   RECEPTIONIST = 'RECEPTIONIST',
   ACCOUNTANT = 'ACCOUNTANT',
+  PATIENT = 'PATIENT',
 }
