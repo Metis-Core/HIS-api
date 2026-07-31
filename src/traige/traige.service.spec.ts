@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { PatientsService } from 'src/patients/patients.service';
+import { QueueService } from 'src/queue/queue.service';
 import { UsersService } from 'src/users/users.service';
 import { Triage } from './entities/traige.entity';
 import { TraigeService } from './traige.service';
@@ -29,6 +30,15 @@ describe('TraigeService', () => {
         {
           provide: UsersService,
           useValue: { findOne: jest.fn() },
+        },
+        {
+          provide: QueueService,
+          useValue: {
+            findVisit: jest.fn(),
+            linkTriage: jest.fn(),
+            findByTriageId: jest.fn(),
+            applyTriagePriority: jest.fn(),
+          },
         },
       ],
     }).compile();

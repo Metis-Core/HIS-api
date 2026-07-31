@@ -1,0 +1,5 @@
+export enum VisitType {
+  WALK_IN = 'WALK_IN',
+  APPOINTMENT = 'APPOINTMENT',
+  EMERGENCY = 'EMERGENCY',
+}

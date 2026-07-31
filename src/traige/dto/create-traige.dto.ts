@@ -23,6 +23,10 @@ export class CreateTriageDto {
 
   @IsOptional()
   @IsUUID()
+  visitId?: string;
+
+  @IsOptional()
+  @IsUUID()
   triagedById?: string;
 
   @IsEnum(TriageAcuity)
