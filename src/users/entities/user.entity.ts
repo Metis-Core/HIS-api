@@ -1,13 +1,11 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn } from 'typeorm';
-import { Department } from 'src/users/enums/department.enum';
+import { Column, Entity } from 'typeorm';
+import { BaseEntity } from 'common/entities/base.entity';
 import { AccountStatus } from 'common/enums/userStatus.enum';
 import { UserRole } from 'common/enums/userRoles.enum';
+import { Department } from 'common/enums/department.enum';
 
 @Entity('users')
-export class User {
-  @PrimaryGeneratedColumn('uuid')
-  id: string;
-
+export class User extends BaseEntity {
   @Column({ unique: true })
   email: string;
 
@@ -17,7 +15,7 @@ export class User {
   @Column({ select: false })
   passwordHash: string;
 
-  @Column({ type: 'enum', enum: UserRole, default: UserRole.PATIENT})
+  @Column({ type: 'enum', enum: UserRole, default: UserRole.PATIENT })
   role: UserRole;
 
   @Column({ type: 'enum', enum: Department })
@@ -27,11 +25,5 @@ export class User {
   status: AccountStatus;
 
   @Column({ type: 'timestamp', nullable: true })
-  passwordLastChangedAt: Date;
-
-  @CreateDateColumn()
-  createdAt: Date;
-
-  @UpdateDateColumn()
-  updatedAt: Date;
+  passwordLastChangedAt: Date | null;
 }
