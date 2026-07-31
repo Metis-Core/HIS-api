@@ -7,7 +7,9 @@ import { Repository } from 'typeorm';
 import { ConsciousnessLevel } from 'src/traige/enums/consciousness-level.enum';
 import { TriageStatus } from 'src/traige/enums/triage-status.enum';
 import { PatientsService } from 'src/patients/patients.service';
+import { QueueService } from 'src/queue/queue.service';
 import { UsersService } from 'src/users/users.service';
+import { Department } from 'common/enums/department.enum';
 import { CreateTriageDto } from './dto/create-traige.dto';
 import { QueryTriageDto } from './dto/query-triage.dto';
 import { UpdateTriageDto } from './dto/update-traige.dto';
@@ -20,6 +22,7 @@ export class TraigeService {
     private readonly triageRepository: Repository<Triage>,
     private readonly patientsService: PatientsService,
     private readonly usersService: UsersService,
+    private readonly queueService: QueueService,
   ) {}
 
   async create(
@@ -33,6 +36,12 @@ export class TraigeService {
       throw new NotFoundException('Triage nurse is required');
     }
     await this.usersService.findOne(triagedById);
+
+    let queueNumber = dto.queueNumber?.trim() ?? null;
+    if (dto.visitId) {
+      const visit = await this.queueService.findVisit(dto.visitId);
+      queueNumber = visit.tokenNumber;
+    }
 
     const now = new Date();
     const triage = this.triageRepository.create({
@@ -61,11 +70,23 @@ export class TraigeService {
       arrivedAt: dto.arrivedAt ? new Date(dto.arrivedAt) : now,
       triagedAt: dto.triagedAt ? new Date(dto.triagedAt) : now,
       completedAt: null,
-      queueNumber: dto.queueNumber?.trim() ?? null,
+      queueNumber,
     });
 
     const saved = await this.triageRepository.save(triage);
-    return this.findOne(saved.id);
+    const triageRecord = await this.findOne(saved.id);
+
+    if (dto.visitId) {
+      await this.queueService.linkTriage(dto.visitId, triageRecord.id);
+      if (
+        triageRecord.status === TriageStatus.COMPLETED ||
+        triageRecord.status === TriageStatus.REFERRED
+      ) {
+        await this.syncVisitQueue(dto.visitId, triageRecord);
+      }
+    }
+
+    return triageRecord;
   }
 
   async findAll(query: QueryTriageDto): Promise<{
@@ -261,7 +282,19 @@ export class TraigeService {
     }
 
     await this.triageRepository.save(triage);
-    return this.findOne(id);
+    const updated = await this.findOne(id);
+
+    if (
+      updated.status === TriageStatus.COMPLETED ||
+      updated.status === TriageStatus.REFERRED
+    ) {
+      const visit = await this.queueService.findByTriageId(updated.id);
+      if (visit) {
+        await this.syncVisitQueue(visit.id, updated);
+      }
+    }
+
+    return updated;
   }
 
   async remove(id: string): Promise<Triage> {
@@ -269,5 +302,16 @@ export class TraigeService {
     triage.status = TriageStatus.CANCELLED;
     triage.completedAt = triage.completedAt ?? new Date();
     return this.triageRepository.save(triage);
+  }
+
+  private async syncVisitQueue(visitId: string, triage: Triage): Promise<void> {
+    const nextDepartment =
+      triage.referredToDepartment ?? Department.OUTPATIENT_CLINIC;
+    await this.queueService.applyTriagePriority(
+      visitId,
+      triage.acuity,
+      triage.id,
+      nextDepartment,
+    );
   }
 }

@@ -14,6 +14,7 @@ import { PaymentsModule } from './payments/payments.module';
 import { PharmacyModule } from './pharmacy/pharmacy.module';
 import { TraigeModule } from './traige/traige.module';
 import { UsersModule } from './users/users.module';
+import { QueueModule } from './queue/queue.module';
 
 @Module({
   imports: [
@@ -30,6 +31,7 @@ import { UsersModule } from './users/users.module';
     AnalyticsModule,
     TraigeModule,
     ConsultationModule,
+    QueueModule,
   ],
   controllers: [AppController],
   providers: [AppService],
