@@ -12,6 +12,7 @@ import { TriageAcuity } from 'src/traige/enums/triage-acuity.enum';
 import { CheckInVisitDto } from './dto/check-in-visit.dto';
 import { CompleteQueueStageDto } from './dto/complete-queue-stage.dto';
 import { QueryQueueDto } from './dto/query-queue.dto';
+import { TransferQueueEntryDto } from './dto/transfer-queue-entry.dto';
 import { QueueEntry } from './entities/queue-entry.entity';
 import { Visit } from './entities/visit.entity';
 import { QueueEntryStatus } from './enums/queue-entry-status.enum';
@@ -323,6 +324,48 @@ export class QueueService {
     entry.notes = notes ?? entry.notes;
     await this.queueEntriesRepository.save(entry);
     return this.findQueueEntry(entry.id);
+  }
+
+  async transfer(
+    entryId: string,
+    dto: TransferQueueEntryDto,
+    servedById: string,
+  ): Promise<{ entry: QueueEntry; visit: Visit; nextEntry: QueueEntry }> {
+    const entry = await this.findQueueEntry(entryId);
+    if (
+      entry.status !== QueueEntryStatus.WAITING &&
+      entry.status !== QueueEntryStatus.CALLED &&
+      entry.status !== QueueEntryStatus.IN_SERVICE
+    ) {
+      throw new BadRequestException('Queue entry cannot be transferred');
+    }
+    if (dto.nextDepartment === entry.department) {
+      throw new BadRequestException(
+        'Target department must differ from the current department',
+      );
+    }
+
+    const now = new Date();
+    entry.status = QueueEntryStatus.TRANSFERRED;
+    entry.completedAt = now;
+    entry.servedById = entry.servedById ?? servedById;
+    if (dto.notes) {
+      entry.notes = dto.notes;
+    }
+    await this.queueEntriesRepository.save(entry);
+
+    const visit = await this.findVisit(entry.visitId);
+    visit.status = VisitStatus.IN_PROGRESS;
+    visit.currentDepartment = dto.nextDepartment;
+    await this.visitsRepository.save(visit);
+
+    const nextEntry = await this.enqueue(visit, dto.nextDepartment, null);
+
+    return {
+      entry: await this.findQueueEntry(entry.id),
+      visit: await this.findVisit(visit.id),
+      nextEntry: await this.findQueueEntry(nextEntry.id),
+    };
   }
 
   async linkTriage(visitId: string, triageId: string): Promise<Visit> {

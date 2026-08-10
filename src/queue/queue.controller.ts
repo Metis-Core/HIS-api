@@ -23,6 +23,7 @@ import { RolesGuard } from 'core/guards/roles.guard';
 import { CheckInVisitDto } from './dto/check-in-visit.dto';
 import { CompleteQueueStageDto } from './dto/complete-queue-stage.dto';
 import { QueryQueueDto } from './dto/query-queue.dto';
+import { TransferQueueEntryDto } from './dto/transfer-queue-entry.dto';
 import { UpdateVisitPriorityDto } from './dto/update-visit-priority.dto';
 import { QueueEntryStatus } from './enums/queue-entry-status.enum';
 import { QueueService } from './queue.service';
@@ -126,6 +127,16 @@ export class QueueController {
     @Body('notes') notes?: string,
   ) {
     return this.queueService.skip(id, notes);
+  }
+
+  @Post('entries/:id/transfer')
+  @Roles(...FLOOR_STAFF)
+  transfer(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: TransferQueueEntryDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.queueService.transfer(id, dto, user.id);
   }
 
   @Patch('visits/:id/priority')
