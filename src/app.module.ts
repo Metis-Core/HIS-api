@@ -6,6 +6,7 @@ import { AnalyticsModule } from './analytics/analytics.module';
 import { AuditlogsModule } from './auditLogs/auditlogs.module';
 import { AuthModule } from './auth/auth.module';
 import { ConsultationModule } from './consultation/consultation.module';
+import { ContactsModule } from './contacts/contacts.module';
 import { InventoryModule } from './inventory/inventory.module';
 import { LabModule } from './lab/lab.module';
 import { NotificationsModule } from './notifications/notifications.module';
@@ -32,6 +33,7 @@ import { QueueModule } from './queue/queue.module';
     TraigeModule,
     ConsultationModule,
     QueueModule,
+    ContactsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

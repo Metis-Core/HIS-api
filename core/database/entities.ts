@@ -1,5 +1,6 @@
 import { AuthToken } from 'src/auth/entities/auth-token.entity';
 import { Consultation } from 'src/consultation/entities/consultation.entity';
+import { Contact } from 'src/contacts/entities/contact.entity';
 import { Patient } from 'src/patients/entities/patient.entity';
 import { QueueEntry } from 'src/queue/entities/queue-entry.entity';
 import { Visit } from 'src/queue/entities/visit.entity';
@@ -10,6 +11,7 @@ export const entities = [
   User,
   AuthToken,
   Patient,
+  Contact,
   Triage,
   Visit,
   QueueEntry,

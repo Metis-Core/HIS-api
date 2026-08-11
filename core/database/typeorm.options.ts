@@ -27,6 +27,7 @@ export function buildDataSourceOptions(
     logging: process.env.NODE_ENV !== 'production',
     entities,
     migrations: [__dirname + '/migrations/*{.ts,.js}'],
+    subscribers: [__dirname + '/subscribers/*{.ts,.js}'],
     migrationsTableName: 'typeorm_migrations',
   };
 }
