@@ -19,7 +19,7 @@ import { buildDataSourceOptions } from 'core/database/typeorm.options';
           DB_PORT: String(configService.get<number>('database.port') ?? 5432),
           DB_USERNAME: configService.get<string>('database.username'),
           DB_PASSWORD: configService.get<string>('database.password'),
-          DB_NAME: configService.get<string>('database.name'),
+          DB_NAME: configService.get<string>('database.name')
         }),
         autoLoadEntities: true,
         entities: [],
