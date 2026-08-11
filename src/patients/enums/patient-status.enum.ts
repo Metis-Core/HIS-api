@@ -1,6 +1,6 @@
 export enum PatientStatus {
-  ACTIVE = 'ACTIVE',
-  INACTIVE = 'INACTIVE',
-  DECEASED = 'DECEASED',
-  MERGED = 'MERGED',
+  ACTIVE = 'active',
+  INACTIVE = 'inactive',
+  DECEASED = 'deceased',
+  MERGED = 'merged',
 }
