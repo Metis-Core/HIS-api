@@ -18,7 +18,6 @@ import { UserRole } from 'common/enums/userRoles.enum';
 import { JwtAuthGuard } from 'core/guards/jwt-auth.guard';
 import { RolesGuard } from 'core/guards/roles.guard';
 import { CreatePatientDto } from './dto/create-patient.dto';
-import { QueryPatientsDto } from './dto/query-patients.dto';
 import { UpdatePatientDto } from './dto/update-patient.dto';
 import { PatientsService } from './patients.service';
 
@@ -33,7 +32,7 @@ const CLINICAL_STAFF = [
 @Controller('patients')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class PatientsController {
-  constructor(private readonly patientsService: PatientsService) {}
+  constructor(private readonly patientsService: PatientsService) { }
 
   @Post()
   @Roles(...CLINICAL_STAFF)
@@ -44,26 +43,8 @@ export class PatientsController {
 
   @Get()
   @Roles(...CLINICAL_STAFF)
-  findAll(@Query() query: QueryPatientsDto) {
-    return this.patientsService.findAll(query);
-  }
-
-  @Get('mrn/:mrn')
-  @Roles(...CLINICAL_STAFF)
-  findByMrn(@Param('mrn') mrn: string) {
-    return this.patientsService.findByMrn(mrn);
-  }
-
-  @Get('national-id/:nationalId')
-  @Roles(...CLINICAL_STAFF)
-  findByNationalId(@Param('nationalId') nationalId: string) {
-    return this.patientsService.findByNationalId(nationalId);
-  }
-
-  @Get('phone/:phone')
-  @Roles(...CLINICAL_STAFF)
-  findByPhone(@Param('phone') phone: string) {
-    return this.patientsService.findByPhone(phone);
+  findAll(@Query() query: Record<string, any>) {
+    return this.patientsService.findManyWithPagination();
   }
 
   @Get(':id')

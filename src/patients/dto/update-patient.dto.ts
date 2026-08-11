@@ -13,6 +13,7 @@ import { Gender } from 'common/enums/gender.enum';
 import { BloodType } from 'src/patients/enums/blood-type.enum';
 import { MaritalStatus } from 'src/patients/enums/marital-status.enum';
 import { PatientStatus } from 'src/patients/enums/patient-status.enum';
+import { PatientType } from 'src/patients/enums/patient-type.enum';
 
 export class UpdatePatientDto {
   @IsOptional()
@@ -57,6 +58,10 @@ export class UpdatePatientDto {
   @IsEnum(PatientStatus)
   status?: PatientStatus;
 
+  @IsOptional()
+  @IsEnum(PatientType)
+  type?: PatientType;
+
   @ValidateIf((_, value) => value !== null)
   @IsOptional()
   @IsString()
@@ -79,49 +84,13 @@ export class UpdatePatientDto {
   @IsOptional()
   @IsString()
   @MaxLength(255)
-  addressLine1?: string | null;
-
-  @ValidateIf((_, value) => value !== null)
-  @IsOptional()
-  @IsString()
-  @MaxLength(255)
-  addressLine2?: string | null;
+  address?: string | null;
 
   @ValidateIf((_, value) => value !== null)
   @IsOptional()
   @IsString()
   @MaxLength(100)
   city?: string | null;
-
-  @ValidateIf((_, value) => value !== null)
-  @IsOptional()
-  @IsString()
-  @MaxLength(100)
-  district?: string | null;
-
-  @ValidateIf((_, value) => value !== null)
-  @IsOptional()
-  @IsString()
-  @MaxLength(100)
-  country?: string | null;
-
-  @ValidateIf((_, value) => value !== null)
-  @IsOptional()
-  @IsString()
-  @MaxLength(100)
-  emergencyContactName?: string | null;
-
-  @ValidateIf((_, value) => value !== null)
-  @IsOptional()
-  @IsString()
-  @MaxLength(30)
-  emergencyContactPhone?: string | null;
-
-  @ValidateIf((_, value) => value !== null)
-  @IsOptional()
-  @IsString()
-  @MaxLength(50)
-  emergencyContactRelation?: string | null;
 
   @ValidateIf((_, value) => value !== null)
   @IsOptional()

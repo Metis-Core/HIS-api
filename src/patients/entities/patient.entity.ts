@@ -8,9 +8,11 @@ import {
 import { BaseEntity } from 'common/entities/base.entity';
 import { Gender } from 'common/enums/gender.enum';
 import { User } from 'src/users/entities/user.entity';
+import { Contact } from 'src/contacts/entities/contact.entity';
 import { BloodType } from 'src/patients/enums/blood-type.enum';
 import { MaritalStatus } from 'src/patients/enums/marital-status.enum';
 import { PatientStatus } from 'src/patients/enums/patient-status.enum';
+import { PatientType } from 'src/patients/enums/patient-type.enum';
 
 @Entity('patients')
 export class Patient extends BaseEntity {
@@ -42,6 +44,13 @@ export class Patient extends BaseEntity {
   @Column({ type: 'enum', enum: PatientStatus, default: PatientStatus.ACTIVE })
   status: PatientStatus;
 
+  @Column({
+    type: 'enum',
+    enum: PatientType,
+    default: PatientType.OUTPATIENT,
+  })
+  type: PatientType;
+
   @Index()
   @Column({ type: 'varchar', length: 30, nullable: true })
   phone: string | null;
@@ -55,28 +64,10 @@ export class Patient extends BaseEntity {
   nationalId: string | null;
 
   @Column({ type: 'varchar', length: 255, nullable: true })
-  addressLine1: string | null;
-
-  @Column({ type: 'varchar', length: 255, nullable: true })
-  addressLine2: string | null;
+  address: string | null;
 
   @Column({ type: 'varchar', length: 100, nullable: true })
   city: string | null;
-
-  @Column({ type: 'varchar', length: 100, nullable: true })
-  district: string | null;
-
-  @Column({ type: 'varchar', length: 100, nullable: true })
-  country: string | null;
-
-  @Column({ type: 'varchar', length: 100, nullable: true })
-  emergencyContactName: string | null;
-
-  @Column({ type: 'varchar', length: 30, nullable: true })
-  emergencyContactPhone: string | null;
-
-  @Column({ type: 'varchar', length: 50, nullable: true })
-  emergencyContactRelation: string | null;
 
   @Column({ type: 'text', nullable: true })
   allergies: string | null;
@@ -91,4 +82,10 @@ export class Patient extends BaseEntity {
   @Index({ unique: true })
   @Column({ type: 'uuid', nullable: true })
   userId: string | null;
+
+  @OneToOne(() => Contact, (contact) => contact.patient, {
+    cascade: true,
+    nullable: true,
+  })
+  contact: Contact | null;
 }
