@@ -1,7 +1,7 @@
 export enum ConsultationType {
-  OUTPATIENT = 'OUTPATIENT',
-  FOLLOW_UP = 'FOLLOW_UP',
-  EMERGENCY = 'EMERGENCY',
-  INPATIENT_ROUND = 'INPATIENT_ROUND',
-  TELEMEDICINE = 'TELEMEDICINE',
+  OUTPATIENT = 'outpatient',
+  FOLLOW_UP = 'follow_up',
+  EMERGENCY = 'emergency',
+  INPATIENT_ROUND = 'inpatient_round',
+  TELEMEDICINE = 'telemedicine',
 }

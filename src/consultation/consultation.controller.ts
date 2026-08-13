@@ -56,7 +56,7 @@ export class ConsultationController {
   @Get()
   @Roles(...CLINICAL_STAFF)
   findAll(@Query() query: QueryConsultationsDto) {
-    return this.consultationService.findAll(query);
+    return this.consultationService.search(query);
   }
 
   @Get('patient/:patientId')
@@ -116,6 +116,6 @@ export class ConsultationController {
   @Delete(':id')
   @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN)
   remove(@Param('id', ParseUUIDPipe) id: string) {
-    return this.consultationService.remove(id);
+    return this.consultationService.cancel(id);
   }
 }

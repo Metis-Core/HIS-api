@@ -18,9 +18,10 @@ import { UpdateConsultationDto } from './dto/update-consultation.dto';
 import { Consultation } from './entities/consultation.entity';
 import { ConsultationStatus } from './enums/consultation-status.enum';
 import { ConsultationType } from './enums/consultation-type.enum';
+import { BaseCrudService } from '../../common/services/crud.service';
 
 @Injectable()
-export class ConsultationService {
+export class ConsultationService extends BaseCrudService<Consultation> {
   constructor(
     @InjectRepository(Consultation)
     private readonly consultationsRepository: Repository<Consultation>,
@@ -29,9 +30,11 @@ export class ConsultationService {
     private readonly patientsService: PatientsService,
     private readonly usersService: UsersService,
     private readonly queueService: QueueService,
-  ) {}
+  ) {
+    super(consultationsRepository);
+  }
 
-  async create(
+  override async create(
     dto: CreateConsultationDto,
     currentUserId?: string,
   ): Promise<Consultation> {
@@ -83,7 +86,7 @@ export class ConsultationService {
     return this.findOne(saved.id);
   }
 
-  async findAll(query: QueryConsultationsDto): Promise<{
+  async search(query: QueryConsultationsDto): Promise<{
     data: Consultation[];
     total: number;
     page: number;
@@ -173,7 +176,7 @@ export class ConsultationService {
     return { data, total, page, limit };
   }
 
-  async findOne(id: string): Promise<Consultation> {
+  override async findOne(id: string): Promise<Consultation> {
     const consultation = await this.consultationsRepository.findOne({
       where: { id },
       relations: {
@@ -206,7 +209,10 @@ export class ConsultationService {
     });
   }
 
-  async update(id: string, dto: UpdateConsultationDto): Promise<Consultation> {
+  override async update(
+    id: string,
+    dto: UpdateConsultationDto,
+  ): Promise<Consultation> {
     const consultation = await this.findOne(id);
     if (consultation.status === ConsultationStatus.CANCELLED) {
       throw new BadRequestException('Cancelled consultation cannot be edited');
@@ -339,10 +345,6 @@ export class ConsultationService {
     }
     await this.consultationsRepository.save(consultation);
     return this.findOne(id);
-  }
-
-  async remove(id: string): Promise<Consultation> {
-    return this.cancel(id);
   }
 
   private async findActiveQueueEntryForVisit(
