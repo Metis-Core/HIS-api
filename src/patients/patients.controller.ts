@@ -18,6 +18,7 @@ import { Roles } from 'common/decorators/roles.decorator';
 import { JwtAuthGuard } from 'core/guards/jwt-auth.guard';
 import { RolesGuard } from 'core/guards/roles.guard';
 import { CreatePatientDto } from './dto/create-patient.dto';
+import { PatientFiltersDto } from './dto/patient-filters.dto';
 import { UpdatePatientDto } from './dto/update-patient.dto';
 import { PatientsService } from './patients.service';
 
@@ -35,8 +36,8 @@ export class PatientsController {
 
   @Get()
   @Roles(RoleGroups.FRONT_DESK_CLINICAL)
-  findAll(@Query() query: Record<string, any>) {
-    return this.patientsService.findManyWithPagination();
+  findAll(@Query() query: PatientFiltersDto) {
+    return this.patientsService.search(query);
   }
 
   @Get(':id')

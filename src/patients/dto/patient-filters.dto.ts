@@ -15,6 +15,11 @@ import { BaseFilterDTO } from '../../../common/dto/filter.dto';
 export class PatientFiltersDto extends BaseFilterDTO {
 
   @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  search?: string;
+
+  @IsOptional()
   @IsEnum(PatientStatus)
   status?: PatientStatus;
 
