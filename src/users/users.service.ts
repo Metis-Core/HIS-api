@@ -11,8 +11,10 @@ import { Department } from 'common/enums/department.enum';
 import { AccountStatus } from 'common/enums/userStatus.enum';
 import { UserRole } from 'common/enums/userRoles.enum';
 import { PasswordService } from 'common/services/password.service';
+import { IPagination } from 'common/response-format';
 import { SignupDto } from 'src/auth/dto/signup.dto';
 import { CreateUserDto } from './dto/create-user.dto';
+import { QueryUsersDto } from './dto/query-users.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { User } from './entities/user.entity';
 
@@ -48,10 +50,35 @@ export class UsersService {
     });
   }
 
-  findAll(): Promise<User[]> {
-    return this.usersRepository.find({
-      order: { createdAt: 'DESC' },
-    });
+  async findAll(query: QueryUsersDto): Promise<IPagination<User>> {
+    const { page = 1, limit = 20, sortOrder = 'DESC' } = query;
+    const qb = this.usersRepository.createQueryBuilder('user');
+
+    if (query.role) {
+      qb.andWhere('user.role = :role', { role: query.role });
+    }
+    if (query.department) {
+      qb.andWhere('user.department = :department', {
+        department: query.department,
+      });
+    }
+    if (query.status) {
+      qb.andWhere('user.status = :status', { status: query.status });
+    }
+    if (query.search) {
+      qb.andWhere(
+        '(LOWER(user.email) LIKE :search OR LOWER(user.username) LIKE :search)',
+        { search: `%${query.search.toLowerCase()}%` },
+      );
+    }
+
+    const [items, total] = await qb
+      .orderBy('user.createdAt', sortOrder)
+      .skip((page - 1) * limit)
+      .take(limit)
+      .getManyAndCount();
+
+    return { items, total };
   }
 
   async findById(id: string): Promise<User | null> {

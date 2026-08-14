@@ -14,9 +14,9 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { CurrentUser } from 'common/decorators/current-user.decorator';
+import { RoleGroups } from 'common/access/role-groups';
 import { Roles } from 'common/decorators/roles.decorator';
 import type { AuthenticatedUser } from 'common/interfaces/authenticated-user.interface';
-import { UserRole } from 'common/enums/userRoles.enum';
 import { JwtAuthGuard } from 'core/guards/jwt-auth.guard';
 import { RolesGuard } from 'core/guards/roles.guard';
 import { TriageStatus } from 'src/traige/enums/triage-status.enum';
@@ -25,21 +25,13 @@ import { QueryTriageDto } from './dto/query-triage.dto';
 import { UpdateTriageDto } from './dto/update-traige.dto';
 import { TraigeService } from './traige.service';
 
-const TRIAGE_STAFF = [
-  UserRole.SUPER_ADMIN,
-  UserRole.ADMIN,
-  UserRole.DOCTOR,
-  UserRole.NURSE,
-  UserRole.RECEPTIONIST,
-] as const;
-
 @Controller('triage')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class TraigeController {
   constructor(private readonly traigeService: TraigeService) {}
 
   @Post()
-  @Roles(...TRIAGE_STAFF)
+  @Roles(RoleGroups.FRONT_DESK_CLINICAL)
   @HttpCode(HttpStatus.CREATED)
   create(
     @Body() createTriageDto: CreateTriageDto,
@@ -49,31 +41,31 @@ export class TraigeController {
   }
 
   @Get()
-  @Roles(...TRIAGE_STAFF)
+  @Roles(RoleGroups.FRONT_DESK_CLINICAL)
   findAll(@Query() query: QueryTriageDto) {
     return this.traigeService.findAll(query);
   }
 
   @Get('queue')
-  @Roles(...TRIAGE_STAFF)
+  @Roles(RoleGroups.FRONT_DESK_CLINICAL)
   findQueue(@Query('status') status?: TriageStatus) {
     return this.traigeService.findQueue(status ?? TriageStatus.WAITING);
   }
 
   @Get('patient/:patientId')
-  @Roles(...TRIAGE_STAFF)
+  @Roles(RoleGroups.FRONT_DESK_CLINICAL)
   findByPatient(@Param('patientId', ParseUUIDPipe) patientId: string) {
     return this.traigeService.findByPatient(patientId);
   }
 
   @Get(':id')
-  @Roles(...TRIAGE_STAFF)
+  @Roles(RoleGroups.FRONT_DESK_CLINICAL)
   findOne(@Param('id', ParseUUIDPipe) id: string) {
     return this.traigeService.findOne(id);
   }
 
   @Patch(':id')
-  @Roles(...TRIAGE_STAFF)
+  @Roles(RoleGroups.FRONT_DESK_CLINICAL)
   update(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() updateTriageDto: UpdateTriageDto,
@@ -82,7 +74,7 @@ export class TraigeController {
   }
 
   @Put(':id')
-  @Roles(...TRIAGE_STAFF)
+  @Roles(RoleGroups.FRONT_DESK_CLINICAL)
   replace(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() updateTriageDto: UpdateTriageDto,
@@ -91,7 +83,7 @@ export class TraigeController {
   }
 
   @Delete(':id')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.NURSE)
+  @Roles(RoleGroups.NURSING_ADMIN)
   remove(@Param('id', ParseUUIDPipe) id: string) {
     return this.traigeService.remove(id);
   }

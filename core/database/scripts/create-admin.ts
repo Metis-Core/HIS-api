@@ -31,7 +31,7 @@ async function bootstrap(): Promise<void> {
       email: EMAIL,
       username: USERNAME,
       password: PASSWORD,
-      role: UserRole.ADMIN,
+      role: UserRole.SUPER_ADMIN,
       department: Department.ADMINISTRATION,
       status: AccountStatus.ACTIVE,
     });

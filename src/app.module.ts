@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { EventEmitterModule } from '@nestjs/event-emitter';
 import { DatabaseModule } from 'core/database/database.module';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
@@ -19,6 +20,7 @@ import { QueueModule } from './queue/queue.module';
 
 @Module({
   imports: [
+    EventEmitterModule.forRoot({ wildcard: true }),
     DatabaseModule,
     AuthModule,
     UsersModule,

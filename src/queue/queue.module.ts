@@ -4,6 +4,7 @@ import { PatientsModule } from 'src/patients/patients.module';
 import { QueueEntry } from './entities/queue-entry.entity';
 import { Visit } from './entities/visit.entity';
 import { QueueController } from './queue.controller';
+import { QueueGateway } from './queue.gateway';
 import { QueueService } from './queue.service';
 
 @Module({
@@ -12,7 +13,7 @@ import { QueueService } from './queue.service';
     PatientsModule,
   ],
   controllers: [QueueController],
-  providers: [QueueService],
+  providers: [QueueService, QueueGateway],
   exports: [QueueService, TypeOrmModule],
 })
 export class QueueModule {}

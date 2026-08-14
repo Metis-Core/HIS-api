@@ -5,6 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { In, Repository } from 'typeorm';
 import { Department } from 'common/enums/department.enum';
 import { PatientsService } from 'src/patients/patients.service';
@@ -18,6 +19,17 @@ import { Visit } from './entities/visit.entity';
 import { QueueEntryStatus } from './enums/queue-entry-status.enum';
 import { VisitStatus } from './enums/visit-status.enum';
 import { VisitType } from './enums/visit-type.enum';
+import { assertTransition } from './queue-state-machine';
+import {
+  QueueEntryCalledEvent,
+  QueueEntryCompletedEvent,
+  QueueEntryCreatedEvent,
+  QueueEntrySkippedEvent,
+  QueueEntryStartedEvent,
+  QueueEntryTransferredEvent,
+  QueueEvent,
+  toQueueEventData,
+} from './events/queue.events';
 
 @Injectable()
 export class QueueService {
@@ -27,7 +39,12 @@ export class QueueService {
     @InjectRepository(QueueEntry)
     private readonly queueEntriesRepository: Repository<QueueEntry>,
     private readonly patientsService: PatientsService,
+    private readonly events: EventEmitter2,
   ) {}
+
+  private emit(event: QueueEvent): void {
+    this.events.emit(event.channel, event);
+  }
 
   async checkIn(
     dto: CheckInVisitDto,
@@ -244,17 +261,13 @@ export class QueueService {
     visit.currentDepartment = department;
     await this.visitsRepository.save(visit);
 
+    this.emit(new QueueEntryCalledEvent(toQueueEventData(next, visit)));
     return this.findQueueEntry(next.id);
   }
 
   async startService(entryId: string, servedById: string): Promise<QueueEntry> {
     const entry = await this.findQueueEntry(entryId);
-    if (
-      entry.status !== QueueEntryStatus.WAITING &&
-      entry.status !== QueueEntryStatus.CALLED
-    ) {
-      throw new BadRequestException('Queue entry cannot be started');
-    }
+    assertTransition(entry.status, QueueEntryStatus.IN_SERVICE);
 
     entry.status = QueueEntryStatus.IN_SERVICE;
     entry.startedAt = new Date();
@@ -267,6 +280,7 @@ export class QueueService {
     visit.currentDepartment = entry.department;
     await this.visitsRepository.save(visit);
 
+    this.emit(new QueueEntryStartedEvent(toQueueEventData(entry, visit)));
     return this.findQueueEntry(entry.id);
   }
 
@@ -276,13 +290,7 @@ export class QueueService {
     servedById: string,
   ): Promise<{ entry: QueueEntry; visit: Visit; nextEntry: QueueEntry | null }> {
     const entry = await this.findQueueEntry(entryId);
-    if (
-      entry.status !== QueueEntryStatus.IN_SERVICE &&
-      entry.status !== QueueEntryStatus.CALLED &&
-      entry.status !== QueueEntryStatus.WAITING
-    ) {
-      throw new BadRequestException('Queue entry cannot be completed');
-    }
+    assertTransition(entry.status, QueueEntryStatus.COMPLETED);
 
     const now = new Date();
     entry.status = QueueEntryStatus.COMPLETED;
@@ -310,6 +318,7 @@ export class QueueService {
     }
     await this.visitsRepository.save(visit);
 
+    this.emit(new QueueEntryCompletedEvent(toQueueEventData(entry, visit)));
     return {
       entry: await this.findQueueEntry(entry.id),
       visit: await this.findVisit(visit.id),
@@ -319,10 +328,14 @@ export class QueueService {
 
   async skip(entryId: string, notes?: string): Promise<QueueEntry> {
     const entry = await this.findQueueEntry(entryId);
+    assertTransition(entry.status, QueueEntryStatus.SKIPPED);
     entry.status = QueueEntryStatus.SKIPPED;
     entry.completedAt = new Date();
     entry.notes = notes ?? entry.notes;
     await this.queueEntriesRepository.save(entry);
+
+    const visit = await this.findVisit(entry.visitId);
+    this.emit(new QueueEntrySkippedEvent(toQueueEventData(entry, visit)));
     return this.findQueueEntry(entry.id);
   }
 
@@ -332,13 +345,7 @@ export class QueueService {
     servedById: string,
   ): Promise<{ entry: QueueEntry; visit: Visit; nextEntry: QueueEntry }> {
     const entry = await this.findQueueEntry(entryId);
-    if (
-      entry.status !== QueueEntryStatus.WAITING &&
-      entry.status !== QueueEntryStatus.CALLED &&
-      entry.status !== QueueEntryStatus.IN_SERVICE
-    ) {
-      throw new BadRequestException('Queue entry cannot be transferred');
-    }
+    assertTransition(entry.status, QueueEntryStatus.TRANSFERRED);
     if (dto.nextDepartment === entry.department) {
       throw new BadRequestException(
         'Target department must differ from the current department',
@@ -361,6 +368,7 @@ export class QueueService {
 
     const nextEntry = await this.enqueue(visit, dto.nextDepartment, null);
 
+    this.emit(new QueueEntryTransferredEvent(toQueueEventData(entry, visit)));
     return {
       entry: await this.findQueueEntry(entry.id),
       visit: await this.findVisit(visit.id),
@@ -412,6 +420,9 @@ export class QueueService {
       activeTriageEntry.completedAt = new Date();
       activeTriageEntry.priority = visit.priority;
       await this.queueEntriesRepository.save(activeTriageEntry);
+      this.emit(
+        new QueueEntryCompletedEvent(toQueueEventData(activeTriageEntry, visit)),
+      );
     }
 
     const existingNext = await this.queueEntriesRepository.findOne({
@@ -475,6 +486,7 @@ export class QueueService {
       entry.status = QueueEntryStatus.SKIPPED;
       entry.completedAt = new Date();
       await this.queueEntriesRepository.save(entry);
+      this.emit(new QueueEntrySkippedEvent(toQueueEventData(entry, visit)));
     }
 
     return this.findVisit(visitId);
@@ -486,7 +498,7 @@ export class QueueService {
     notes: string | null,
   ): Promise<QueueEntry> {
     const sequenceNumber = await this.nextSequence(department, visit.serviceDate);
-    return this.queueEntriesRepository.save(
+    const entry = await this.queueEntriesRepository.save(
       this.queueEntriesRepository.create({
         visitId: visit.id,
         department,
@@ -500,6 +512,9 @@ export class QueueService {
         notes,
       }),
     );
+
+    this.emit(new QueueEntryCreatedEvent(toQueueEventData(entry, visit)));
+    return entry;
   }
 
   private async nextSequence(

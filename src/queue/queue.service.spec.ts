@@ -1,4 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { PatientsService } from 'src/patients/patients.service';
 import { QueueEntry } from './entities/queue-entry.entity';
@@ -35,6 +36,10 @@ describe('QueueService', () => {
         {
           provide: PatientsService,
           useValue: { findOne: jest.fn() },
+        },
+        {
+          provide: EventEmitter2,
+          useValue: { emit: jest.fn() },
         },
       ],
     }).compile();
