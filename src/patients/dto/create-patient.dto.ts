@@ -91,5 +91,9 @@ export class CreatePatientDto {
   insurancePolicyNumber?: string;
 
   @IsOptional()
+  @IsString()
+  allergies?: string;
+
+  @IsOptional()
   emergencyContact: CreateContactDTO
 }
