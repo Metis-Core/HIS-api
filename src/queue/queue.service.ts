@@ -67,6 +67,7 @@ export class QueueService {
     }
 
     const visitType = dto.visitType ?? VisitType.WALK_IN;
+    const startDepartment = dto.department ?? Department.TRIAGE;
     const priority =
       visitType === VisitType.EMERGENCY ? 1 : visitType === VisitType.APPOINTMENT ? 4 : 5;
     const tokenNumber = await this.generateToken(visitType, serviceDate);
@@ -79,7 +80,7 @@ export class QueueService {
         serviceDate,
         visitType,
         status: VisitStatus.OPEN,
-        currentDepartment: Department.TRIAGE,
+        currentDepartment: startDepartment,
         priority,
         triageId: null,
         checkedInById,
@@ -90,7 +91,7 @@ export class QueueService {
 
     const queueEntry = await this.enqueue(
       visit,
-      Department.TRIAGE,
+      startDepartment,
       dto.notes ?? null,
     );
 

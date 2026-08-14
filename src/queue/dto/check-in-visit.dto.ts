@@ -1,4 +1,5 @@
 import { IsEnum, IsOptional, IsString, IsUUID, MaxLength } from 'class-validator';
+import { Department } from 'common/enums/department.enum';
 import { VisitType } from 'src/queue/enums/visit-type.enum';
 
 export class CheckInVisitDto {
@@ -8,6 +9,10 @@ export class CheckInVisitDto {
   @IsOptional()
   @IsEnum(VisitType)
   visitType?: VisitType;
+
+  @IsOptional()
+  @IsEnum(Department)
+  department?: Department;
 
   @IsOptional()
   @IsString()

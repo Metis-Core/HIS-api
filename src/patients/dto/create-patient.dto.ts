@@ -81,5 +81,15 @@ export class CreatePatientDto {
   city?: string;
 
   @IsOptional()
+  @IsString()
+  @MaxLength(150)
+  insuranceProvider?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  insurancePolicyNumber?: string;
+
+  @IsOptional()
   emergencyContact: CreateContactDTO
 }

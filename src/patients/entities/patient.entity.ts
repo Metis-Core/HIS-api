@@ -69,6 +69,12 @@ export class Patient extends BaseEntity {
   @Column({ type: 'varchar', length: 100, nullable: true })
   city: string | null;
 
+  @Column({ type: 'varchar', length: 150, nullable: true })
+  insuranceProvider: string | null;
+
+  @Column({ type: 'varchar', length: 100, nullable: true })
+  insurancePolicyNumber: string | null;
+
   @Column({ type: 'text', nullable: true })
   allergies: string | null;
 

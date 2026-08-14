@@ -14,4 +14,18 @@ export class ContactsService extends BaseCrudService<Contact> {
   ) {
     super(contactsRepository)
   }
+
+  async upsertForPatient(
+    patientId: string,
+    dto: { name: string; phone: string; relationship?: string },
+  ): Promise<Contact> {
+    const existing = await this.contactsRepository.findOne({ where: { patientId } });
+    if (existing) {
+      await this.contactsRepository.update({ patientId }, dto);
+      return this.contactsRepository.findOne({ where: { patientId } }) as Promise<Contact>;
+    }
+    return this.contactsRepository.save(
+      this.contactsRepository.create({ patientId, ...dto }),
+    );
+  }
 }

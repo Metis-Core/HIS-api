@@ -1,6 +1,7 @@
 import {
   ConflictException,
   Injectable,
+  NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { EventEmitter2 } from '@nestjs/event-emitter';
@@ -43,6 +44,17 @@ export class PatientsService extends BaseCrudService<Patient> {
     this.events.emit(event.channel, event);
   }
 
+  override async findOne(id: string): Promise<Patient> {
+    const patient = await this.patientsRepository.findOne({
+      where: { id },
+      relations: { contact: true },
+    });
+    if (!patient) {
+      throw new NotFoundException(`Patient with ID ${id} not found`);
+    }
+    return patient;
+  }
+
   override async create(entity: CreatePatientDto): Promise<Patient> {
     const { emergencyContact, ...rest } = entity;
 
@@ -78,7 +90,12 @@ export class PatientsService extends BaseCrudService<Patient> {
     dto: UpdatePatientDto,
   ): Promise<Patient> {
     const existing = await this.findOne(id);
-    const updated = await super.update(id, dto);
+    const { emergencyContact, ...rest } = dto;
+    await super.update(id, rest);
+    if (emergencyContact) {
+      await this.contactService.upsertForPatient(id, emergencyContact);
+    }
+    const updated = await this.findOne(id);
 
     this.emit(new PatientUpdatedEvent(toPatientEventData(updated)));
     if (dto.status && dto.status !== existing.status) {
@@ -109,6 +126,7 @@ export class PatientsService extends BaseCrudService<Patient> {
       order: { createdAt: sortOrder },
       skip: (page - 1) * limit,
       take: limit,
+      relations: { contact: true },
     });
   }
 

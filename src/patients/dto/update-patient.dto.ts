@@ -8,12 +8,15 @@ import {
   Matches,
   MaxLength,
   ValidateIf,
+  ValidateNested,
 } from 'class-validator';
+import { Type } from 'class-transformer';
 import { Gender } from 'common/enums/gender.enum';
 import { BloodType } from 'src/patients/enums/blood-type.enum';
 import { MaritalStatus } from 'src/patients/enums/marital-status.enum';
 import { PatientStatus } from 'src/patients/enums/patient-status.enum';
 import { PatientType } from 'src/patients/enums/patient-type.enum';
+import { CreateContactDTO } from '../../contacts/dto/create-contact.dto';
 
 export class UpdatePatientDto {
   @IsOptional()
@@ -91,6 +94,23 @@ export class UpdatePatientDto {
   @IsString()
   @MaxLength(100)
   city?: string | null;
+
+  @ValidateIf((_, value) => value !== null)
+  @IsOptional()
+  @IsString()
+  @MaxLength(150)
+  insuranceProvider?: string | null;
+
+  @ValidateIf((_, value) => value !== null)
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  insurancePolicyNumber?: string | null;
+
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => CreateContactDTO)
+  emergencyContact?: CreateContactDTO;
 
   @ValidateIf((_, value) => value !== null)
   @IsOptional()
