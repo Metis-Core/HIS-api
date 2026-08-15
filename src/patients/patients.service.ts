@@ -44,17 +44,6 @@ export class PatientsService extends BaseCrudService<Patient> {
     this.events.emit(event.channel, event);
   }
 
-  override async findOne(id: string): Promise<Patient> {
-    const patient = await this.patientsRepository.findOne({
-      where: { id },
-      relations: { contact: true },
-    });
-    if (!patient) {
-      throw new NotFoundException(`Patient with ID ${id} not found`);
-    }
-    return patient;
-  }
-
   override async create(entity: CreatePatientDto): Promise<Patient> {
     const { emergencyContact, ...rest } = entity;
 
