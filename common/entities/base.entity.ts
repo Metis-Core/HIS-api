@@ -1,4 +1,5 @@
 import {
+  Column,
   CreateDateColumn,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
@@ -13,4 +14,7 @@ export abstract class BaseEntity {
 
   @UpdateDateColumn()
   updatedAt: Date;
+
+  @Column('jsonb', { nullable: true })
+  metadata?: any;
 }

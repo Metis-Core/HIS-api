@@ -1,9 +1,11 @@
 import { AuthToken } from 'src/auth/entities/auth-token.entity';
 import { Consultation } from 'src/consultation/entities/consultation.entity';
 import { Contact } from 'src/contacts/entities/contact.entity';
+import { OneTimePassword } from 'src/otp/entities/otp.entity';
 import { Patient } from 'src/patients/entities/patient.entity';
 import { QueueEntry } from 'src/queue/entities/queue-entry.entity';
 import { Visit } from 'src/queue/entities/visit.entity';
+import { Service } from 'src/services/entities/service.entity';
 import { Triage } from 'src/traige/entities/traige.entity';
 import { User } from 'src/users/entities/user.entity';
 
@@ -16,4 +18,6 @@ export const entities = [
   Visit,
   QueueEntry,
   Consultation,
+  OneTimePassword,
+  Service,
 ];
