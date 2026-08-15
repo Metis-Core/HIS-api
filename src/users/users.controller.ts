@@ -14,7 +14,7 @@ import {
 } from '@nestjs/common';
 import { RoleGroups } from 'common/access/role-groups';
 import { Roles } from 'common/decorators/roles.decorator';
-import { IPagination } from 'common/response-format';
+import { formatErrorResponse, formatResponse, IPagination } from 'common/response-format';
 import { JwtAuthGuard } from 'core/guards/jwt-auth.guard';
 import { RolesGuard } from 'core/guards/roles.guard';
 import { CreateUserDto } from './dto/create-user.dto';
@@ -24,13 +24,13 @@ import { UserResponseDto } from './dto/user-response.dto';
 import { UsersService } from './users.service';
 
 @Controller('users')
-@UseGuards(JwtAuthGuard, RolesGuard)
+// @UseGuards(JwtAuthGuard, RolesGuard)
 @UseInterceptors(ClassSerializerInterceptor)
 export class UsersController {
-  constructor(private readonly usersService: UsersService) {}
+  constructor(private readonly usersService: UsersService) { }
 
   @Post()
-  @Roles(RoleGroups.ADMINS)
+  // @Roles(RoleGroups.ADMINS)
   async create(@Body() createUserDto: CreateUserDto): Promise<UserResponseDto> {
     return UserResponseDto.fromEntity(
       await this.usersService.create(createUserDto),
@@ -38,16 +38,17 @@ export class UsersController {
   }
 
   @Get()
-  @Roles(RoleGroups.ADMINS)
-  async findAll(
-    @Query() query: QueryUsersDto,
-  ): Promise<IPagination<UserResponseDto>> {
-    const { items, total } = await this.usersService.findAll(query);
-    return { items: UserResponseDto.fromEntities(items), total };
+  // @Roles(RoleGroups.ADMINS)
+  async findAll(): Promise<IPagination<any> | any> {
+    try {
+      return formatResponse(await this.usersService.findManyWithPagination())
+    } catch (error) {
+      return formatErrorResponse(error)
+    }
   }
 
   @Get(':id')
-  @Roles(RoleGroups.ADMINS)
+  // @Roles(RoleGroups.ADMINS)
   async findOne(
     @Param('id', ParseUUIDPipe) id: string,
   ): Promise<UserResponseDto> {
@@ -55,7 +56,7 @@ export class UsersController {
   }
 
   @Patch(':id')
-  @Roles(RoleGroups.ADMINS)
+  // @Roles(RoleGroups.ADMINS)
   async update(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() updateUserDto: UpdateUserDto,
@@ -66,7 +67,7 @@ export class UsersController {
   }
 
   @Delete(':id')
-  @Roles(RoleGroups.ADMINS)
+  // @Roles(RoleGroups.ADMINS)
   remove(@Param('id', ParseUUIDPipe) id: string) {
     return this.usersService.remove(id);
   }

@@ -11,9 +11,11 @@ import { ContactsModule } from './contacts/contacts.module';
 import { InventoryModule } from './inventory/inventory.module';
 import { LabModule } from './lab/lab.module';
 import { NotificationsModule } from './notifications/notifications.module';
+import { OtpModule } from './otp/otp.module';
 import { PatientsModule } from './patients/patients.module';
 import { PaymentsModule } from './payments/payments.module';
 import { PharmacyModule } from './pharmacy/pharmacy.module';
+import { ServicesModule } from './services/services.module';
 import { TraigeModule } from './traige/traige.module';
 import { UsersModule } from './users/users.module';
 import { QueueModule } from './queue/queue.module';
@@ -36,6 +38,8 @@ import { QueueModule } from './queue/queue.module';
     ConsultationModule,
     QueueModule,
     ContactsModule,
+    OtpModule,
+    ServicesModule,
   ],
   controllers: [AppController],
   providers: [AppService],

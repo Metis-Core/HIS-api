@@ -57,16 +57,16 @@ export const QUEUE_EVENT_PATTERN = 'queue.entry.*';
 export function toQueueEventData(
   entry: QueueEntry,
   visit: Visit,
-): QueueEventData {
-  return {
-    entryId: entry.id,
-    visitId: visit.id,
-    patientId: visit.patientId,
-    department: entry.department,
-    tokenNumber: visit.tokenNumber,
-    status: entry.status,
-    priority: entry.priority,
-    sequenceNumber: entry.sequenceNumber,
-    servedById: entry.servedById,
-  };
+): any {
+  // return {
+  //   entryId: entry.id,
+  //   visitId: visit.id,
+  //   patientId: visit.patientId,
+  //   department: entry.department,
+  //   // tokenNumber: visit.tokenNumber,
+  //   status: entry.status,
+  //   priority: entry.priority,
+  //   sequenceNumber: entry.sequenceNumber,
+  //   servedById: entry.servedById,
+  // };
 }

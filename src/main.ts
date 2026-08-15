@@ -5,14 +5,8 @@ import { AppModule } from './app.module';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
-  const rawOrigins = process.env.CORS_ORIGINS ?? 'http://localhost:4000';
-  const origins = rawOrigins
-    .split(',')
-    .map((o) => o.trim())
-    .filter(Boolean);
-
   app.enableCors({
-    origin: origins.includes('*') ? true : origins,
+    origin: '*',
     credentials: true,
     methods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
@@ -28,4 +22,5 @@ async function bootstrap() {
   );
   await app.listen(process.env.PORT ?? 8000);
 }
+
 bootstrap();

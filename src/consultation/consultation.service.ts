@@ -8,7 +8,7 @@ import { In, Repository } from 'typeorm';
 import { Department } from 'common/enums/department.enum';
 import { PatientsService } from 'src/patients/patients.service';
 import { UsersService } from 'src/users/users.service';
-import { QueueService } from 'src/queue/queue.service';
+// import { QueueService } from 'src/queue/queue.service';
 import { QueueEntry } from 'src/queue/entities/queue-entry.entity';
 import { QueueEntryStatus } from 'src/queue/enums/queue-entry-status.enum';
 import { CompleteConsultationDto } from './dto/complete-consultation.dto';
@@ -29,7 +29,7 @@ export class ConsultationService extends BaseCrudService<Consultation> {
     private readonly queueEntriesRepository: Repository<QueueEntry>,
     private readonly patientsService: PatientsService,
     private readonly usersService: UsersService,
-    private readonly queueService: QueueService,
+    // private readonly queueService: QueueService,
   ) {
     super(consultationsRepository);
   }
@@ -48,15 +48,15 @@ export class ConsultationService extends BaseCrudService<Consultation> {
 
     let triageId = dto.triageId ?? null;
     if (dto.visitId) {
-      const visit = await this.queueService.findVisit(dto.visitId);
-      if (visit.patientId !== dto.patientId) {
-        throw new BadRequestException(
-          'Visit does not belong to this patient',
-        );
-      }
-      if (!triageId && visit.triageId) {
-        triageId = visit.triageId;
-      }
+      // const visit = await this.queueService.findVisit(dto.visitId);
+      // if (visit.patientId !== dto.patientId) {
+      //   throw new BadRequestException(
+      //     'Visit does not belong to this patient',
+      //   );
+      // }
+      // if (!triageId && visit.triageId) {
+      //   triageId = visit.triageId;
+      // }
     }
 
     const now = new Date();
@@ -228,12 +228,12 @@ export class ConsultationService extends BaseCrudService<Consultation> {
     }
     if (dto.visitId !== undefined) {
       if (dto.visitId) {
-        const visit = await this.queueService.findVisit(dto.visitId);
-        if (visit.patientId !== consultation.patientId) {
-          throw new BadRequestException(
-            'Visit does not belong to this patient',
-          );
-        }
+        // const visit = await this.queueService.findVisit(dto.visitId);
+        // if (visit.patientId !== consultation.patientId) {
+        //   throw new BadRequestException(
+        //     'Visit does not belong to this patient',
+        //   );
+        // }
       }
       consultation.visitId = dto.visitId || null;
     }
@@ -316,14 +316,14 @@ export class ConsultationService extends BaseCrudService<Consultation> {
         consultation.department,
       );
       if (activeEntry) {
-        queueUpdate = await this.queueService.completeStage(
-          activeEntry.id,
-          {
-            nextDepartment: dto.nextDepartment,
-            notes: dto.notes,
-          },
-          consultation.doctorId,
-        );
+        // queueUpdate = await this.queueService.completeStage(
+        //   activeEntry.id,
+        //   {
+        //     nextDepartment: dto.nextDepartment,
+        //     notes: dto.notes,
+        //   },
+        //   consultation.doctorId,
+        // );
       }
     }
 

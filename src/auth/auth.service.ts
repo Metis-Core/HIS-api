@@ -30,7 +30,7 @@ export class AuthService {
     private readonly passwordService: PasswordService,
     @InjectRepository(AuthToken)
     private readonly authTokensRepository: Repository<AuthToken>,
-  ) {}
+  ) { }
 
   async signup(dto: SignupDto): Promise<AuthTokensDto> {
     const user = await this.usersService.registerPatient(dto);
@@ -38,7 +38,7 @@ export class AuthService {
     return tokens;
   }
 
-  async login(dto: LoginDto): Promise<AuthTokensDto> {
+  async login(dto: LoginDto): Promise<Record<string, any>> {
     const user = await this.usersService.findByEmailOrUsername(dto.identifier);
     if (!user) {
       throw new UnauthorizedException('Invalid credentials');
@@ -54,7 +54,7 @@ export class AuthService {
 
     this.usersService.assertAccountUsable(user);
     const { tokens } = await this.issueTokens(user);
-    return tokens;
+    return { tokens, user: user };
   }
 
   async refresh(requestUser: RefreshRequestUser): Promise<AuthTokensDto> {
