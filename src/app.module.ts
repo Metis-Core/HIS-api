@@ -1,6 +1,9 @@
 import { Module } from '@nestjs/common';
+import { APP_GUARD } from '@nestjs/core';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { DatabaseModule } from 'core/database/database.module';
+import { JwtAuthGuard } from 'core/guards/jwt-auth.guard';
+import { RolesGuard } from 'core/guards/roles.guard';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AnalyticsModule } from './analytics/analytics.module';
@@ -42,6 +45,10 @@ import { QueueModule } from './queue/queue.module';
     ServicesModule,
   ],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [
+    AppService,
+    { provide: APP_GUARD, useClass: JwtAuthGuard },
+    { provide: APP_GUARD, useClass: RolesGuard },
+  ],
 })
 export class AppModule {}

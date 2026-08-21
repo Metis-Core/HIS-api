@@ -11,14 +11,11 @@ import {
   Post,
   Put,
   Query,
-  UseGuards,
 } from '@nestjs/common';
 import { CurrentUser } from 'common/decorators/current-user.decorator';
 import { RoleGroups } from 'common/access/role-groups';
 import { Roles } from 'common/decorators/roles.decorator';
 import type { AuthenticatedUser } from 'common/interfaces/authenticated-user.interface';
-import { JwtAuthGuard } from 'core/guards/jwt-auth.guard';
-import { RolesGuard } from 'core/guards/roles.guard';
 import { TriageStatus } from 'src/traige/enums/triage-status.enum';
 import { CreateTriageDto } from './dto/create-traige.dto';
 import { QueryTriageDto } from './dto/query-triage.dto';
@@ -26,7 +23,6 @@ import { UpdateTriageDto } from './dto/update-traige.dto';
 import { TraigeService } from './traige.service';
 
 @Controller('triage')
-@UseGuards(JwtAuthGuard, RolesGuard)
 export class TraigeController {
   constructor(private readonly traigeService: TraigeService) {}
 
