@@ -8,7 +8,7 @@ import { In, Repository } from 'typeorm';
 import { Department } from 'common/enums/department.enum';
 import { PatientsService } from 'src/patients/patients.service';
 import { UsersService } from 'src/users/users.service';
-// import { QueueService } from 'src/queue/queue.service';
+import { QueueEntriesService } from 'src/queue/queue-entries.service';
 import { QueueEntry } from 'src/queue/entities/queue-entry.entity';
 import { QueueEntryStatus } from 'src/queue/enums/queue-entry-status.enum';
 import { CompleteConsultationDto } from './dto/complete-consultation.dto';
@@ -29,7 +29,7 @@ export class ConsultationService extends BaseCrudService<Consultation> {
     private readonly queueEntriesRepository: Repository<QueueEntry>,
     private readonly patientsService: PatientsService,
     private readonly usersService: UsersService,
-    // private readonly queueService: QueueService,
+    private readonly queueEntries: QueueEntriesService,
   ) {
     super(consultationsRepository);
   }
@@ -311,20 +311,14 @@ export class ConsultationService extends BaseCrudService<Consultation> {
 
     let queueUpdate: unknown | null = null;
     if (consultation.visitId) {
-      const activeEntry = await this.findActiveQueueEntryForVisit(
+      if (dto.nextIntents && dto.nextIntents.length > 0) {
+        await this.queueEntries.appendIntents(consultation.visitId, dto.nextIntents);
+      }
+      const result = await this.queueEntries.completeCurrentFor(
         consultation.visitId,
         consultation.department,
       );
-      if (activeEntry) {
-        // queueUpdate = await this.queueService.completeStage(
-        //   activeEntry.id,
-        //   {
-        //     nextDepartment: dto.nextDepartment,
-        //     notes: dto.notes,
-        //   },
-        //   consultation.doctorId,
-        // );
-      }
+      if (result) queueUpdate = result;
     }
 
     return {

@@ -7,6 +7,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { DeepPartial, Repository } from 'typeorm';
 import { PatientsService } from 'src/patients/patients.service';
+import { UsersService } from 'src/users/users.service';
 import { CreateVisitDTO } from './dto/create-visit.dto';
 import { QueueEntry } from './entities/queue-entry.entity';
 import { Visit } from './entities/visit.entity';
@@ -22,6 +23,7 @@ export class VisitsService extends BaseCrudService<Visit> {
     @InjectRepository(QueueEntry)
     private readonly queueEntriesRepository: Repository<QueueEntry>,
     private readonly patientsService: PatientsService,
+    private readonly usersService: UsersService,
     private readonly events: EventEmitter2,
   ) {
     super(visitsRepository)
@@ -33,6 +35,7 @@ export class VisitsService extends BaseCrudService<Visit> {
     if (!handler) {
       throw new NotFoundException('Handler ID is required')
     }
+    await this.usersService.findOne(handler)
     if (!patientId || !(await this.patientsService.findByStringId(patientId))) {
       throw new NotFoundException('Patient not found')
     }

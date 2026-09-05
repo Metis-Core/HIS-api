@@ -33,13 +33,13 @@ export class TraigeController {
     @Body() createTriageDto: CreateTriageDto,
     @CurrentUser() user: AuthenticatedUser,
   ) {
-    return this.traigeService.create(createTriageDto, user.id);
+    return this.traigeService.createTriage(createTriageDto, user.id);
   }
 
   @Get()
   @Roles(RoleGroups.FRONT_DESK_CLINICAL)
   findAll(@Query() query: QueryTriageDto) {
-    return this.traigeService.findAll(query);
+    return this.traigeService.search(query);
   }
 
   @Get('queue')
@@ -66,7 +66,7 @@ export class TraigeController {
     @Param('id', ParseUUIDPipe) id: string,
     @Body() updateTriageDto: UpdateTriageDto,
   ) {
-    return this.traigeService.update(id, updateTriageDto);
+    return this.traigeService.updateTriage(id, updateTriageDto);
   }
 
   @Put(':id')
@@ -75,12 +75,12 @@ export class TraigeController {
     @Param('id', ParseUUIDPipe) id: string,
     @Body() updateTriageDto: UpdateTriageDto,
   ) {
-    return this.traigeService.update(id, updateTriageDto);
+    return this.traigeService.updateTriage(id, updateTriageDto);
   }
 
   @Delete(':id')
   @Roles(RoleGroups.NURSING_ADMIN)
   remove(@Param('id', ParseUUIDPipe) id: string) {
-    return this.traigeService.remove(id);
+    return this.traigeService.cancel(id);
   }
 }

@@ -1,4 +1,9 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { createHash, randomInt, randomUUID } from 'crypto';
@@ -12,6 +17,8 @@ const MAX_ATTEMPTS = 5;
 
 @Injectable()
 export class OtpService extends BaseCrudService<OneTimePassword> {
+  private readonly logger = new Logger(OtpService.name);
+
   constructor(
     @InjectRepository(OneTimePassword)
     private readonly otpRepository: Repository<OneTimePassword>,
@@ -19,8 +26,12 @@ export class OtpService extends BaseCrudService<OneTimePassword> {
     super(otpRepository);
   }
 
-  async generate(userId: string): Promise<{ verificationToken: string; expiresAt: Date }> {
-    const code = randomInt(0, 10 ** OTP_LENGTH).toString().padStart(OTP_LENGTH, '0');
+  async generate(
+    userId: string,
+  ): Promise<{ verificationToken: string; expiresAt: Date }> {
+    const code = randomInt(0, 10 ** OTP_LENGTH)
+      .toString()
+      .padStart(OTP_LENGTH, '0');
     const verificationToken = randomUUID();
     const expiresAt = new Date(Date.now() + OTP_TTL_MINUTES * 60 * 1000);
 
@@ -32,7 +43,7 @@ export class OtpService extends BaseCrudService<OneTimePassword> {
     });
 
     // delivery integration (SMS/email) happens elsewhere; log for now
-    console.log(`OTP for user ${userId}: ${code}`);
+    this.logger.log(`OTP for user ${userId}: ${code}`);
 
     return { verificationToken, expiresAt };
   }

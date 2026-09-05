@@ -7,25 +7,28 @@ import { Repository } from 'typeorm';
 import { ConsciousnessLevel } from 'src/traige/enums/consciousness-level.enum';
 import { TriageStatus } from 'src/traige/enums/triage-status.enum';
 import { PatientsService } from 'src/patients/patients.service';
-// import { QueueService } from 'src/queue/queue.service';
+import { QueueEntriesService } from 'src/queue/queue-entries.service';
 import { UsersService } from 'src/users/users.service';
 import { Department } from 'common/enums/department.enum';
+import { BaseCrudService } from 'common/services/crud.service';
 import { CreateTriageDto } from './dto/create-traige.dto';
 import { QueryTriageDto } from './dto/query-triage.dto';
 import { UpdateTriageDto } from './dto/update-traige.dto';
 import { Triage } from './entities/traige.entity';
 
 @Injectable()
-export class TraigeService {
+export class TraigeService extends BaseCrudService<Triage> {
   constructor(
     @InjectRepository(Triage)
     private readonly triageRepository: Repository<Triage>,
     private readonly patientsService: PatientsService,
     private readonly usersService: UsersService,
-    // private readonly queueService: QueueService,
-  ) {}
+    private readonly queueEntries: QueueEntriesService,
+  ) {
+    super(triageRepository);
+  }
 
-  async create(
+  async createTriage(
     dto: CreateTriageDto,
     currentUserId?: string,
   ): Promise<Triage> {
@@ -77,7 +80,9 @@ export class TraigeService {
     const triageRecord = await this.findOne(saved.id);
 
     if (dto.visitId) {
-      // await this.queueService.linkTriage(dto.visitId, triageRecord.id);
+      if (dto.nextIntents && dto.nextIntents.length > 0) {
+        await this.queueEntries.appendIntents(dto.visitId, dto.nextIntents);
+      }
       if (
         triageRecord.status === TriageStatus.COMPLETED ||
         triageRecord.status === TriageStatus.REFERRED
@@ -89,7 +94,7 @@ export class TraigeService {
     return triageRecord;
   }
 
-  async findAll(query: QueryTriageDto): Promise<{
+  async search(query: QueryTriageDto): Promise<{
     data: Triage[];
     total: number;
     page: number;
@@ -196,7 +201,7 @@ export class TraigeService {
       .getMany();
   }
 
-  async findOne(id: string): Promise<Triage> {
+  override async findOne(id: string): Promise<Triage> {
     const triage = await this.triageRepository.findOne({
       where: { id },
       relations: { patient: true, triagedBy: true },
@@ -207,7 +212,7 @@ export class TraigeService {
     return triage;
   }
 
-  async update(id: string, dto: UpdateTriageDto): Promise<Triage> {
+  async updateTriage(id: string, dto: UpdateTriageDto): Promise<Triage> {
     const triage = await this.findOne(id);
 
     if (dto.patientId !== undefined && dto.patientId !== triage.patientId) {
@@ -284,20 +289,22 @@ export class TraigeService {
     await this.triageRepository.save(triage);
     const updated = await this.findOne(id);
 
-    if (
-      updated.status === TriageStatus.COMPLETED ||
-      updated.status === TriageStatus.REFERRED
-    ) {
-      // const visit = await this.queueService.findByTriageId(updated.id);
-      // if (visit) {
-      //   await this.syncVisitQueue(visit.id, updated);
-      // }
+    if (dto.visitId) {
+      if (dto.nextIntents && dto.nextIntents.length > 0) {
+        await this.queueEntries.appendIntents(dto.visitId, dto.nextIntents);
+      }
+      if (
+        updated.status === TriageStatus.COMPLETED ||
+        updated.status === TriageStatus.REFERRED
+      ) {
+        await this.syncVisitQueue(dto.visitId, updated);
+      }
     }
 
     return updated;
   }
 
-  async remove(id: string): Promise<Triage> {
+  async cancel(id: string): Promise<Triage> {
     const triage = await this.findOne(id);
     triage.status = TriageStatus.CANCELLED;
     triage.completedAt = triage.completedAt ?? new Date();
@@ -305,13 +312,6 @@ export class TraigeService {
   }
 
   private async syncVisitQueue(visitId: string, triage: Triage): Promise<void> {
-    const nextDepartment =
-      triage.referredToDepartment ?? Department.OUTPATIENT_CLINIC;
-    // await this.queueService.applyTriagePriority(
-    //   visitId,
-    //   triage.acuity,
-    //   triage.id,
-    //   nextDepartment,
-    // );
+    await this.queueEntries.completeCurrentFor(visitId, Department.TRIAGE);
   }
 }

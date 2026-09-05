@@ -22,7 +22,7 @@ export function buildDataSourceOptions(
     username: env.DB_USERNAME ?? 'postgres',
     password: env.DB_PASSWORD ?? 'postgres',
     database: env.DB_NAME ?? 'his',
-    synchronize: true,
+    synchronize: false,
     migrationsRun: false,
     logging: process.env.NODE_ENV !== 'production',
     entities,

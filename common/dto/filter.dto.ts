@@ -20,5 +20,5 @@ export class BaseFilterDTO {
   limit?: number = 20;
 
   @IsOptional()
-  createdAt: Date
+  createdAt?: Date;
 }

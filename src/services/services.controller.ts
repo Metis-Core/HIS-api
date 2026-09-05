@@ -30,7 +30,7 @@ export class ServicesController {
   constructor(private readonly servicesService: ServicesService) {}
 
   @Post()
-  // @Roles(RoleGroups.ADMINS)
+  @Roles(RoleGroups.ADMINS)
   async create(
     @Body() createServiceDTO: CreateServiceDTO,
   ): Promise<ServiceResponseDTO> {
@@ -40,7 +40,6 @@ export class ServicesController {
   }
 
   @Get()
-  // @Roles(RoleGroups.ADMINS)
   async findAll(
     @Query() query: QueryServicesDTO,
   ): Promise<IPagination<ServiceResponseDTO>> {
@@ -49,7 +48,6 @@ export class ServicesController {
   }
 
   @Get(':id')
-  // @Roles(RoleGroups.ADMINS)
   async findOne(
     @Param('id', ParseUUIDPipe) id: string,
   ): Promise<ServiceResponseDTO> {
@@ -59,7 +57,7 @@ export class ServicesController {
   }
 
   @Patch(':id')
-  // @Roles(RoleGroups.ADMINS)
+  @Roles(RoleGroups.ADMINS)
   async update(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() updateServiceDTO: UpdateServiceDTO,
@@ -70,7 +68,7 @@ export class ServicesController {
   }
 
   @Delete(':id')
-  // @Roles(RoleGroups.ADMINS)
+  @Roles(RoleGroups.ADMINS)
   remove(@Param('id', ParseUUIDPipe) id: string) {
     return this.servicesService.remove(id);
   }

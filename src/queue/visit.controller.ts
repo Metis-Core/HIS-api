@@ -1,29 +1,36 @@
 import {
     Body,
     Controller,
+    Delete,
     Get,
-    NotFoundException,
     Param,
+    ParseUUIDPipe,
     Post,
     Put,
-    UseGuards,
+    Query,
     UsePipes,
     ValidationPipe,
 } from '@nestjs/common';
-import { JwtAuthGuard } from 'core/guards/jwt-auth.guard';
-import { RolesGuard } from 'core/guards/roles.guard';
+import { CurrentUser } from 'common/decorators/current-user.decorator';
+import { RoleGroups } from 'common/access/role-groups';
+import { Roles } from 'common/decorators/roles.decorator';
+import type { AuthenticatedUser } from 'common/interfaces/authenticated-user.interface';
+import { Department } from 'common/enums/department.enum';
+import { QueueEntriesService } from './queue-entries.service';
 import { VisitsService } from './visit.service';
 import { formatErrorResponse, formatResponse } from '../../common/response-format';
 import { CreateVisitDTO } from './dto/create-visit.dto';
 import { UpdateVisitDTO } from './dto/update-visit.dto';
-import { UsersService } from '../users/users.service';
 
 @Controller('visits')
-// @UseGuards(JwtAuthGuard, RolesGuard)
 export class VisitController {
-    constructor(private readonly visitService: VisitsService, private readonly userService: UsersService) { }
+    constructor(
+        private readonly visitService: VisitsService,
+        private readonly queueEntries: QueueEntriesService,
+    ) { }
 
     @Get()
+    @Roles(RoleGroups.FLOOR_STAFF)
     async getAllVisits() {
         try {
             const visits = await this.visitService.findManyWithPagination({ relations: { queueEntries: true } })
@@ -34,6 +41,7 @@ export class VisitController {
     }
 
     @Get('/queues')
+    @Roles(RoleGroups.FLOOR_STAFF)
     async getQueues() {
         try {
             const visits = await this.visitService.findManyWithPagination({ relations: { queueEntries: true, patient: true }, take: 100 })
@@ -43,15 +51,115 @@ export class VisitController {
         }
     }
 
-    @Post()
-    @UsePipes(new ValidationPipe())
-    async create(@Body() entity: CreateVisitDTO) {
+    @Get('/queue/department/:department')
+    @Roles(RoleGroups.FLOOR_STAFF)
+    async getDepartmentQueue(@Param('department') department: Department) {
         try {
-            const id = '727693f1-815c-4ef1-ab7e-487308761017'
-            if (!id || !(await this.userService.findById(id))) {
-                throw new NotFoundException('User not found')
-            }
-            const visit = await this.visitService.create({ ...entity, handler: id })
+            const entries = await this.queueEntries.findByDepartment(department)
+            return formatResponse(entries)
+        } catch (error) {
+            return formatErrorResponse(error)
+        }
+    }
+
+    @Get('/queue/visit/:visitId')
+    @Roles(RoleGroups.FLOOR_STAFF)
+    async getVisitQueue(@Param('visitId', ParseUUIDPipe) visitId: string) {
+        try {
+            const entries = await this.queueEntries.findByVisit(visitId)
+            return formatResponse(entries)
+        } catch (error) {
+            return formatErrorResponse(error)
+        }
+    }
+
+    @Post('/queue/entries/:id/call')
+    @Roles(RoleGroups.FLOOR_STAFF)
+    async callEntry(
+        @Param('id', ParseUUIDPipe) id: string,
+        @CurrentUser() user: AuthenticatedUser,
+    ) {
+        try {
+            const entry = await this.queueEntries.call(id, user.id)
+            return formatResponse(entry)
+        } catch (error) {
+            return formatErrorResponse(error)
+        }
+    }
+
+    @Post('/queue/entries/:id/start')
+    @Roles(RoleGroups.FLOOR_STAFF)
+    async startEntry(
+        @Param('id', ParseUUIDPipe) id: string,
+        @CurrentUser() user: AuthenticatedUser,
+    ) {
+        try {
+            const entry = await this.queueEntries.start(id, user.id)
+            return formatResponse(entry)
+        } catch (error) {
+            return formatErrorResponse(error)
+        }
+    }
+
+    @Post('/queue/entries/:id/complete')
+    @Roles(RoleGroups.FLOOR_STAFF)
+    async completeEntry(
+        @Param('id', ParseUUIDPipe) id: string,
+        @Body('notes') notes?: string,
+    ) {
+        try {
+            const result = await this.queueEntries.complete(id, notes)
+            return formatResponse(result)
+        } catch (error) {
+            return formatErrorResponse(error)
+        }
+    }
+
+    @Post('/queue/entries/:id/skip')
+    @Roles(RoleGroups.FLOOR_STAFF)
+    async skipEntry(
+        @Param('id', ParseUUIDPipe) id: string,
+        @Body('notes') notes?: string,
+    ) {
+        try {
+            const result = await this.queueEntries.skip(id, notes)
+            return formatResponse(result)
+        } catch (error) {
+            return formatErrorResponse(error)
+        }
+    }
+
+    @Delete('/queue/entries/:id')
+    @Roles(RoleGroups.RECEPTION)
+    async removeEntry(@Param('id', ParseUUIDPipe) id: string) {
+        try {
+            const result = await this.queueEntries.remove(id)
+            return formatResponse(result)
+        } catch (error) {
+            return formatErrorResponse(error)
+        }
+    }
+
+    @Post('/queue/visit/:visitId/append')
+    @Roles(RoleGroups.CLINICAL_STAFF)
+    async appendVisitIntents(
+        @Param('visitId', ParseUUIDPipe) visitId: string,
+        @Body('intents') intents: string[],
+    ) {
+        try {
+            const created = await this.queueEntries.appendIntents(visitId, (intents ?? []) as any)
+            return formatResponse(created)
+        } catch (error) {
+            return formatErrorResponse(error)
+        }
+    }
+
+    @Post()
+    @Roles(RoleGroups.CHECK_IN_STAFF)
+    @UsePipes(new ValidationPipe())
+    async create(@Body() entity: CreateVisitDTO, @CurrentUser() user: AuthenticatedUser) {
+        try {
+            const visit = await this.visitService.create({ ...entity, handler: user.id })
             return formatResponse(visit)
         } catch (error) {
             return formatErrorResponse(error)
@@ -59,9 +167,16 @@ export class VisitController {
     }
 
     @Get(':id')
+    @Roles(RoleGroups.FLOOR_STAFF)
     async getVisit(@Param('id') id: string) {
         try {
-            const visit = await this.visitService.findByStringId(id, { relations: { queueEntries: true } })
+            const visit = await this.visitService.findByStringId(id, {
+                relations: {
+                    patient: true,
+                    queueEntries: { servedBy: true },
+                    checkedInBy: true,
+                },
+            })
             return formatResponse(visit)
         } catch (error) {
             return formatErrorResponse(error)
@@ -69,6 +184,7 @@ export class VisitController {
     }
 
     @Put(':id')
+    @Roles(RoleGroups.RECEPTION)
     @UsePipes(new ValidationPipe({ whitelist: true }))
     async updateVisit(@Param('id') id: string, @Body() entity: UpdateVisitDTO) {
         try {

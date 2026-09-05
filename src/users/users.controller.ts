@@ -10,6 +10,8 @@ import {
   Post,
   UseInterceptors,
 } from '@nestjs/common';
+import { RoleGroups } from 'common/access/role-groups';
+import { Roles } from 'common/decorators/roles.decorator';
 import { formatErrorResponse, formatResponse, IPagination } from 'common/response-format';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
@@ -22,6 +24,7 @@ export class UsersController {
   constructor(private readonly usersService: UsersService) { }
 
   @Post()
+  @Roles(RoleGroups.ADMINS)
   async create(@Body() createUserDto: CreateUserDto): Promise<UserResponseDto> {
     return UserResponseDto.fromEntity(
       await this.usersService.create(createUserDto),
@@ -29,6 +32,7 @@ export class UsersController {
   }
 
   @Get()
+  @Roles(RoleGroups.ADMINS)
   async findAll(): Promise<IPagination<any> | any> {
     try {
       return formatResponse(await this.usersService.findManyWithPagination())
@@ -55,6 +59,7 @@ export class UsersController {
   }
 
   @Delete(':id')
+  @Roles(RoleGroups.ADMINS)
   remove(@Param('id', ParseUUIDPipe) id: string) {
     return this.usersService.remove(id);
   }
