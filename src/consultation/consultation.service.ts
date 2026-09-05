@@ -87,7 +87,7 @@ export class ConsultationService extends BaseCrudService<Consultation> {
   }
 
   async search(query: QueryConsultationsDto): Promise<{
-    data: Consultation[];
+    items: Consultation[];
     total: number;
     page: number;
     limit: number;
@@ -172,8 +172,8 @@ export class ConsultationService extends BaseCrudService<Consultation> {
       .skip((page - 1) * limit)
       .take(limit);
 
-    const [data, total] = await qb.getManyAndCount();
-    return { data, total, page, limit };
+    const [items, total] = await qb.getManyAndCount();
+    return { items, total, page, limit };
   }
 
   override async findOne(id: string): Promise<Consultation> {

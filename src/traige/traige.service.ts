@@ -95,7 +95,7 @@ export class TraigeService extends BaseCrudService<Triage> {
   }
 
   async search(query: QueryTriageDto): Promise<{
-    data: Triage[];
+    items: Triage[];
     total: number;
     page: number;
     limit: number;
@@ -168,8 +168,8 @@ export class TraigeService extends BaseCrudService<Triage> {
       .skip((page - 1) * limit)
       .take(limit);
 
-    const [data, total] = await qb.getManyAndCount();
-    return { data, total, page, limit };
+    const [items, total] = await qb.getManyAndCount();
+    return { items, total, page, limit };
   }
 
   async findByPatient(patientId: string): Promise<Triage[]> {

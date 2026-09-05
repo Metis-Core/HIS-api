@@ -40,7 +40,7 @@ export class PatientsController {
   }
 
   @Get()
-  @Roles(RoleGroups.FRONT_DESK_CLINICAL)
+  @Roles(RoleGroups.FLOOR_STAFF)
   async findAll() {
     try {
       const patients = await this.patientsService.findManyWithPagination({
@@ -53,7 +53,7 @@ export class PatientsController {
   }
 
   @Get(':id')
-  @Roles(RoleGroups.FRONT_DESK_CLINICAL)
+  @Roles(RoleGroups.FLOOR_STAFF)
   async findOne(@Param('id', ParseUUIDPipe) id: string) {
     try {
       const patient = await this.patientsService.findByStringId(id);
