@@ -49,6 +49,10 @@ export class CreatePrescriptionDto {
   consultationId?: string;
 
   @IsOptional()
+  @IsUUID()
+  visitId?: string;
+
+  @IsOptional()
   @IsString()
   notes?: string;
 

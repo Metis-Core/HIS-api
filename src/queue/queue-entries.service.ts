@@ -190,6 +190,25 @@ export class QueueEntriesService {
     return saved;
   }
 
+  async ensureIntent(
+    visitId: string | null | undefined,
+    intent: VisitIntenentsEnum,
+  ): Promise<QueueEntry | null> {
+    if (!visitId) return null;
+    const department = intentDepartmentMap[intent];
+    const active = await this.entries.findOne({
+      where: {
+        visitId,
+        department,
+        status: In(OPEN_STATUSES as QueueEntryStatus[]),
+      },
+      order: { sequenceNumber: 'ASC' },
+    });
+    if (active) return active;
+    const [created] = await this.appendIntents(visitId, [intent]);
+    return created ?? null;
+  }
+
   private async advanceNext(current: QueueEntry): Promise<QueueEntry | null> {
     const next = await this.entries.findOne({
       where: {

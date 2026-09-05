@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
@@ -14,6 +15,7 @@ import { InventoryItem } from 'src/inventory/entities/inventory-item.entity';
 import { InventoryTransactionType } from 'src/inventory/enums/inventoryTransactionType.enum';
 import { PatientsService } from 'src/patients/patients.service';
 import { QueueEntriesService } from 'src/queue/queue-entries.service';
+import { VisitIntenentsEnum } from 'src/queue/enums/visit-type.enum';
 import { UsersService } from 'src/users/users.service';
 import { CreatePrescriptionDto } from './dto/create-prescription.dto';
 import { DispensePrescriptionDto } from './dto/dispense-prescription.dto';
@@ -28,6 +30,8 @@ import { PrescriptionDispensedEvent } from './events/prescription-dispensed.even
 
 @Injectable()
 export class PharmacyService extends BaseCrudService<Prescription> {
+  private readonly logger = new Logger(PharmacyService.name);
+
   constructor(
     @InjectRepository(Prescription)
     private readonly prescriptionsRepository: Repository<Prescription>,
@@ -90,10 +94,21 @@ export class PharmacyService extends BaseCrudService<Prescription> {
       );
       await manager.save(rows);
 
-      return manager.findOneOrFail(Prescription, {
+      const full = await manager.findOneOrFail(Prescription, {
         where: { id: saved.id },
         relations: { items: { item: true }, patient: true, prescribedBy: true },
       });
+
+      if (dto.visitId) {
+        try {
+          await this.queueEntries.ensureIntent(dto.visitId, VisitIntenentsEnum.PHARMACY);
+        } catch (err) {
+          // Queue enqueue is best-effort; the prescription stands regardless.
+          this.logger.warn(`Failed to enqueue visit ${dto.visitId} for pharmacy: ${(err as Error).message}`);
+        }
+      }
+
+      return full;
     });
   }
 

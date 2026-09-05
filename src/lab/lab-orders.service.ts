@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
@@ -11,6 +12,7 @@ import { IPagination } from 'common/response-format';
 import { Department } from 'common/enums/department.enum';
 import { PatientsService } from 'src/patients/patients.service';
 import { QueueEntriesService } from 'src/queue/queue-entries.service';
+import { VisitIntenentsEnum } from 'src/queue/enums/visit-type.enum';
 import { UsersService } from 'src/users/users.service';
 import { CreateLabOrderDto } from './dto/create-lab-order.dto';
 import { QueryLabOrdersDto } from './dto/query-lab-orders.dto';
@@ -27,6 +29,8 @@ import { LabOrderCompletedEvent } from './events/lab-order-completed.event';
 
 @Injectable()
 export class LabOrdersService extends BaseCrudService<LabOrder> {
+  private readonly logger = new Logger(LabOrdersService.name);
+
   constructor(
     @InjectRepository(LabOrder)
     private readonly labOrdersRepository: Repository<LabOrder>,
@@ -92,6 +96,16 @@ export class LabOrdersService extends BaseCrudService<LabOrder> {
         LabOrderCreatedEvent.name,
         new LabOrderCreatedEvent(full.id, full.patientId, orderedById),
       );
+
+      if (full.visitId) {
+        try {
+          await this.queueEntries.ensureIntent(full.visitId, VisitIntenentsEnum.LAB);
+        } catch (err) {
+          // Queue enqueue is best-effort; the order stands regardless.
+          this.logger.warn(`Failed to enqueue visit ${full.visitId} for lab: ${(err as Error).message}`);
+        }
+      }
+
       return full;
     });
   }
