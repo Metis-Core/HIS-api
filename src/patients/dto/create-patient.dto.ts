@@ -8,7 +8,9 @@ import {
   IsUUID,
   Matches,
   MaxLength,
+  ValidateNested,
 } from 'class-validator';
+import { Type } from 'class-transformer';
 import { Gender } from 'common/enums/gender.enum';
 import { BloodType } from 'src/patients/enums/blood-type.enum';
 import { MaritalStatus } from 'src/patients/enums/marital-status.enum';
@@ -95,5 +97,7 @@ export class CreatePatientDto {
   allergies?: string;
 
   @IsOptional()
-  emergencyContact: CreateContactDTO
+  @ValidateNested()
+  @Type(() => CreateContactDTO)
+  emergencyContact?: CreateContactDTO;
 }

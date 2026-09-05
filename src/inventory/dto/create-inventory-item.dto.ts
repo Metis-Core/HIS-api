@@ -55,6 +55,25 @@ export class CreateInventoryItemDto {
   manufacturer?: string;
 
   @IsOptional()
+  @IsString()
+  @MaxLength(50)
+  strength?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(50)
+  dosageForm?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  genericName?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  isControlled?: boolean;
+
+  @IsOptional()
   @IsBoolean()
   isActive?: boolean;
 }

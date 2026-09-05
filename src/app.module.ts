@@ -22,6 +22,7 @@ import { ServicesModule } from './services/services.module';
 import { TraigeModule } from './traige/traige.module';
 import { UsersModule } from './users/users.module';
 import { QueueModule } from './queue/queue.module';
+import { DocumentsModule } from './documents/documents.module';
 
 @Module({
   imports: [
@@ -43,6 +44,7 @@ import { QueueModule } from './queue/queue.module';
     ContactsModule,
     OtpModule,
     ServicesModule,
+    DocumentsModule,
   ],
   controllers: [AppController],
   providers: [

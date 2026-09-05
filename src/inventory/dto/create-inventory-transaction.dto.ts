@@ -1,4 +1,5 @@
 import {
+  IsDateString,
   IsEnum,
   IsInt,
   IsOptional,
@@ -39,4 +40,17 @@ export class CreateInventoryTransactionDto {
   @IsOptional()
   @IsString()
   notes?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  batchNumber?: string;
+
+  @IsOptional()
+  @IsDateString()
+  expiryDate?: string;
+
+  @IsOptional()
+  @IsDateString()
+  manufactureDate?: string;
 }

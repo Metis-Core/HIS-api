@@ -211,6 +211,9 @@ export class InventoryStockService {
       referenceId: dto.referenceId ?? null,
       performedById,
       notes: dto.notes ?? null,
+      batchNumber: dto.batchNumber ?? null,
+      expiryDate: dto.expiryDate ?? null,
+      manufactureDate: dto.manufactureDate ?? null,
     });
     return manager.save(txn);
   }

@@ -3,6 +3,23 @@ import { BaseEntity } from 'common/entities/base.entity';
 import { LabSampleType } from '../enums/lab-sample-type.enum';
 import { LabTestCategory } from '../enums/lab-test-category.enum';
 
+export type LabResultFieldType = 'number' | 'text' | 'select' | 'boolean';
+
+export interface LabResultField {
+  key: string;
+  label: string;
+  type: LabResultFieldType;
+  unit?: string;
+  referenceRange?: string;
+  options?: string[];
+  required?: boolean;
+  helpText?: string;
+}
+
+export interface LabResultSchema {
+  fields: LabResultField[];
+}
+
 @Entity('lab_tests')
 export class LabTest extends BaseEntity {
   @Index({ unique: true })
@@ -32,6 +49,9 @@ export class LabTest extends BaseEntity {
 
   @Column({ type: 'int', nullable: true })
   turnaroundHours: number | null;
+
+  @Column({ type: 'jsonb', nullable: true })
+  resultSchema: LabResultSchema | null;
 
   @Column({ type: 'boolean', default: true })
   isActive: boolean;

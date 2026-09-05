@@ -33,6 +33,18 @@ export class InventoryItem extends BaseEntity {
   @Column({ type: 'varchar', length: 100, nullable: true })
   manufacturer: string | null;
 
+  @Column({ type: 'varchar', length: 50, nullable: true })
+  strength: string | null;
+
+  @Column({ type: 'varchar', length: 50, nullable: true })
+  dosageForm: string | null;
+
+  @Column({ type: 'varchar', length: 100, nullable: true })
+  genericName: string | null;
+
+  @Column({ type: 'boolean', default: false })
+  isControlled: boolean;
+
   @Column({ type: 'boolean', default: true })
   isActive: boolean;
 }

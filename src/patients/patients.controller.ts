@@ -31,36 +31,24 @@ export class PatientsController {
   @Roles(RoleGroups.FRONT_DESK_CLINICAL)
   @HttpCode(HttpStatus.CREATED)
   async create(@Body() entity: CreatePatientDto) {
-    try {
-      const patient = await this.patientsService.create({ ...entity });
-      return formatResponse(patient);
-    } catch (error) {
-      return formatErrorResponse(error);
-    }
+    const patient = await this.patientsService.create({ ...entity });
+    return formatResponse(patient);
   }
 
   @Get()
   @Roles(RoleGroups.FLOOR_STAFF)
   async findAll() {
-    try {
-      const patients = await this.patientsService.findManyWithPagination({
-        relations: { contact: true },
-      });
-      return formatResponse(patients);
-    } catch (error) {
-      return formatErrorResponse(error);
-    }
+    const patients = await this.patientsService.findManyWithPagination({
+      relations: { contact: true },
+    });
+    return formatResponse(patients);
   }
 
   @Get(':id')
   @Roles(RoleGroups.FLOOR_STAFF)
   async findOne(@Param('id', ParseUUIDPipe) id: string) {
-    try {
-      const patient = await this.patientsService.findByStringId(id);
-      return formatResponse(patient);
-    } catch (error) {
-      return formatErrorResponse(error);
-    }
+    const patient = await this.patientsService.findByStringId(id);
+    return formatResponse(patient);
   }
 
   @Patch(':id')

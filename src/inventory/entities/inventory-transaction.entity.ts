@@ -59,4 +59,13 @@ export class InventoryTransaction extends BaseEntity {
 
   @Column({ type: 'text', nullable: true })
   notes: string | null;
+
+  @Column({ type: 'varchar', length: 100, nullable: true })
+  batchNumber: string | null;
+
+  @Column({ type: 'date', nullable: true })
+  expiryDate: string | null;
+
+  @Column({ type: 'date', nullable: true })
+  manufactureDate: string | null;
 }
