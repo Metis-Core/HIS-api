@@ -51,6 +51,15 @@ export class ServicesService extends BaseCrudService<Service> {
     return { items, total };
   }
 
+  findConsultationService(): Promise<Service | null> {
+    return this.servicesRepository
+      .createQueryBuilder('service')
+      .where('service.isActive = true')
+      .andWhere('LOWER(service.name) LIKE :name', { name: 'consultation%' })
+      .orderBy('service.name', 'ASC')
+      .getOne();
+  }
+
   override async update(id: string, dto: UpdateServiceDTO): Promise<Service> {
     if (dto.name) {
       const existing = await this.servicesRepository.findOne({

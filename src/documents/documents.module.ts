@@ -4,11 +4,12 @@ import { Consultation } from 'src/consultation/entities/consultation.entity';
 import { LabOrder } from 'src/lab/entities/lab-order.entity';
 import { Prescription } from 'src/pharmacy/entities/prescription.entity';
 import { Visit } from 'src/queue/entities/visit.entity';
+import { VisitCharge } from 'src/payments/entities/visit-charge.entity';
 import { DocumentsController } from './documents.controller';
 import { DocumentsService } from './documents.service';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([LabOrder, Prescription, Consultation, Visit])],
+  imports: [TypeOrmModule.forFeature([LabOrder, Prescription, Consultation, Visit, VisitCharge])],
   controllers: [DocumentsController],
   providers: [DocumentsService],
   exports: [DocumentsService],

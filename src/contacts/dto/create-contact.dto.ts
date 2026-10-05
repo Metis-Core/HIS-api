@@ -1,6 +1,5 @@
 import {
   IsNotEmpty,
-  IsOptional,
   IsString,
   MaxLength,
 } from 'class-validator';
@@ -16,8 +15,8 @@ export class CreateContactDTO {
   @MaxLength(30)
   phone: string;
 
-  @IsOptional()
   @IsString()
+  @IsNotEmpty()
   @MaxLength(50)
-  relationship?: string;
+  relationship: string;
 }

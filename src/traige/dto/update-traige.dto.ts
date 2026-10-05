@@ -1,6 +1,5 @@
 import { Type } from 'class-transformer';
 import {
-  IsArray,
   IsDateString,
   IsEnum,
   IsInt,
@@ -17,7 +16,6 @@ import { Department } from 'common/enums/department.enum';
 import { ConsciousnessLevel } from 'src/traige/enums/consciousness-level.enum';
 import { TriageAcuity } from 'src/traige/enums/triage-acuity.enum';
 import { TriageStatus } from 'src/traige/enums/triage-status.enum';
-import { VisitIntenentsEnum } from 'src/queue/enums/visit-type.enum';
 
 export class UpdateTriageDto {
   @IsOptional()
@@ -151,11 +149,6 @@ export class UpdateTriageDto {
   @IsString()
   @MaxLength(32)
   queueNumber?: string | null;
-
-  @IsOptional()
-  @IsArray()
-  @IsEnum(VisitIntenentsEnum, { each: true })
-  nextIntents?: VisitIntenentsEnum[];
 
   @IsOptional()
   @IsUUID()

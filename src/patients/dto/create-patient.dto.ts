@@ -96,8 +96,7 @@ export class CreatePatientDto {
   @IsString()
   allergies?: string;
 
-  @IsOptional()
   @ValidateNested()
   @Type(() => CreateContactDTO)
-  emergencyContact?: CreateContactDTO;
+  emergencyContact: CreateContactDTO;
 }

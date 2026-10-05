@@ -10,6 +10,7 @@ import { PatientsService } from 'src/patients/patients.service';
 import { QueueEntriesService } from 'src/queue/queue-entries.service';
 import { UsersService } from 'src/users/users.service';
 import { Department } from 'common/enums/department.enum';
+import { VisitIntenentsEnum } from 'src/queue/enums/visit-type.enum';
 import { BaseCrudService } from 'common/services/crud.service';
 import { CreateTriageDto } from './dto/create-traige.dto';
 import { QueryTriageDto } from './dto/query-triage.dto';
@@ -80,9 +81,6 @@ export class TraigeService extends BaseCrudService<Triage> {
     const triageRecord = await this.findOne(saved.id);
 
     if (dto.visitId) {
-      if (dto.nextIntents && dto.nextIntents.length > 0) {
-        await this.queueEntries.appendIntents(dto.visitId, dto.nextIntents);
-      }
       if (
         triageRecord.status === TriageStatus.COMPLETED ||
         triageRecord.status === TriageStatus.REFERRED
@@ -290,9 +288,6 @@ export class TraigeService extends BaseCrudService<Triage> {
     const updated = await this.findOne(id);
 
     if (dto.visitId) {
-      if (dto.nextIntents && dto.nextIntents.length > 0) {
-        await this.queueEntries.appendIntents(dto.visitId, dto.nextIntents);
-      }
       if (
         updated.status === TriageStatus.COMPLETED ||
         updated.status === TriageStatus.REFERRED
@@ -313,5 +308,6 @@ export class TraigeService extends BaseCrudService<Triage> {
 
   private async syncVisitQueue(visitId: string, triage: Triage): Promise<void> {
     await this.queueEntries.completeCurrentFor(visitId, Department.TRIAGE);
+    await this.queueEntries.ensureIntent(visitId, VisitIntenentsEnum.CONSULTATION);
   }
 }

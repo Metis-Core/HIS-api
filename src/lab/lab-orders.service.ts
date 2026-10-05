@@ -94,7 +94,13 @@ export class LabOrdersService extends BaseCrudService<LabOrder> {
 
       this.eventEmitter.emit(
         LabOrderCreatedEvent.name,
-        new LabOrderCreatedEvent(full.id, full.patientId, orderedById),
+        new LabOrderCreatedEvent(
+          full.id,
+          full.patientId,
+          orderedById,
+          full.visitId,
+          full.items.map((item) => ({ itemId: item.id, testName: item.test.name, price: item.test.price })),
+        ),
       );
 
       if (full.visitId) {

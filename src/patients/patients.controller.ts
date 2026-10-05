@@ -47,7 +47,9 @@ export class PatientsController {
   @Get(':id')
   @Roles(RoleGroups.FLOOR_STAFF)
   async findOne(@Param('id', ParseUUIDPipe) id: string) {
-    const patient = await this.patientsService.findByStringId(id);
+    const patient = await this.patientsService.findByStringId(id, {
+      relations: { contact: true },
+    });
     return formatResponse(patient);
   }
 

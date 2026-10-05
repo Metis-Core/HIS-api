@@ -6,6 +6,7 @@ import { Consultation } from 'src/consultation/entities/consultation.entity';
 import { LabOrder } from 'src/lab/entities/lab-order.entity';
 import { Prescription } from 'src/pharmacy/entities/prescription.entity';
 import { Visit } from 'src/queue/entities/visit.entity';
+import { VisitCharge } from 'src/payments/entities/visit-charge.entity';
 import { renderDischargeSummary } from './templates/discharge.template';
 import { renderLabOrderReport } from './templates/lab-order.template';
 import { renderPrescription } from './templates/prescription.template';
@@ -25,6 +26,8 @@ export class DocumentsService {
     private readonly consultations: Repository<Consultation>,
     @InjectRepository(Visit)
     private readonly visits: Repository<Visit>,
+    @InjectRepository(VisitCharge)
+    private readonly charges: Repository<VisitCharge>,
   ) {}
 
   private async toHtml(mjml: string, opts: { autoPrint?: boolean } = {}): Promise<string> {
@@ -87,11 +90,11 @@ export class DocumentsService {
 
     const consultations = await this.consultations.find({
       where: { visitId },
-      relations: { patient: true, doctor: true },
+      select: { id: true },
     });
-    const labOrders = await this.labOrders.find({
+    const charges = await this.charges.find({
       where: { visitId },
-      relations: { items: { test: true } },
+      order: { createdAt: 'ASC' },
     });
     // Prescriptions link by consultation, not visit — collect via consultation IDs.
     const consultationIds = consultations.map((c) => c.id);
@@ -105,7 +108,7 @@ export class DocumentsService {
       : [];
 
     return this.toHtml(
-      renderVisitReceipt({ visit, consultations, labOrders, prescriptions }),
+      renderVisitReceipt({ visit, charges, prescriptions }),
       { autoPrint },
     );
   }

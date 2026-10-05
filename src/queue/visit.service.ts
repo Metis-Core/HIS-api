@@ -1,5 +1,4 @@
 import {
-  BadRequestException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -13,7 +12,11 @@ import { QueueEntry } from './entities/queue-entry.entity';
 import { Visit } from './entities/visit.entity';
 import { QueueEntryStatus } from './enums/queue-entry-status.enum';
 import { intentDepartmentMap } from './intent-department.map';
+import { VisitIntenentsEnum } from './enums/visit-type.enum';
+import { VisitCheckedInEvent } from './events/visit-checked-in.event';
 import { BaseCrudService } from '../../common/services/crud.service';
+
+const CHECK_IN_INTENTS = [VisitIntenentsEnum.EXAMINATION, VisitIntenentsEnum.CONSULTATION]
 
 @Injectable()
 export class VisitsService extends BaseCrudService<Visit> {
@@ -30,7 +33,7 @@ export class VisitsService extends BaseCrudService<Visit> {
   }
 
   override async create(entity: CreateVisitDTO & { handler: string }): Promise<Visit> {
-    const { patientId, intent, visitType, handler } = entity
+    const { patientId, visitType, insuranceVerification, handler } = entity
 
     if (!handler) {
       throw new NotFoundException('Handler ID is required')
@@ -39,18 +42,24 @@ export class VisitsService extends BaseCrudService<Visit> {
     if (!patientId || !(await this.patientsService.findByStringId(patientId))) {
       throw new NotFoundException('Patient not found')
     }
-    if (!intent || intent.length < 1) {
-      throw new BadRequestException('Visit intent is required')
-    }
 
     const visit = await this.visitsRepository.save({
       patientId,
       checkedInById: handler,
       visitType,
-      metadata: { initialIntents: intent },
+      metadata: {
+        initialIntents: CHECK_IN_INTENTS,
+        ...(insuranceVerification && {
+          insuranceVerification: {
+            ...insuranceVerification,
+            verifiedById: handler,
+            verifiedAt: new Date().toISOString(),
+          },
+        }),
+      },
     })
 
-    const entries = intent.map((item, index) => ({
+    const entries = CHECK_IN_INTENTS.map((item, index) => ({
       visitId: visit.id,
       department: intentDepartmentMap[item],
       status: QueueEntryStatus.WAITING,
@@ -58,6 +67,11 @@ export class VisitsService extends BaseCrudService<Visit> {
       sequenceNumber: index + 1,
     }))
     await this.queueEntriesRepository.save(entries)
+
+    this.events.emit(
+      VisitCheckedInEvent.channel,
+      new VisitCheckedInEvent(visit.id, patientId, handler),
+    )
 
     return visit
   }

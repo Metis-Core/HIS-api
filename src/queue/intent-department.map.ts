@@ -6,6 +6,8 @@ export const intentDepartmentMap: Record<VisitIntenentsEnum, Department> = {
   [VisitIntenentsEnum.EXAMINATION]: Department.TRIAGE,
   [VisitIntenentsEnum.LAB]: Department.MAIN_LABORATORY,
   [VisitIntenentsEnum.RADIOLOGY]: Department.RADIOLOGY,
+  [VisitIntenentsEnum.DENTAL]: Department.DENTAL,
+  [VisitIntenentsEnum.ANTENATAL]: Department.ANTENATAL,
   [VisitIntenentsEnum.PHARMACY]: Department.MAIN_PHARMACY,
   [VisitIntenentsEnum.SURGERY]: Department.INPATIENT_WARD,
   [VisitIntenentsEnum.POSTOPERATIVE]: Department.INPATIENT_WARD,

@@ -1,34 +1,46 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  ParseUUIDPipe,
+  Patch,
+  Post,
+} from '@nestjs/common';
+import { RoleGroups } from 'common/access/role-groups';
+import { CurrentUser } from 'common/decorators/current-user.decorator';
+import { Roles } from 'common/decorators/roles.decorator';
+import type { AuthenticatedUser } from 'common/interfaces/authenticated-user.interface';
+import { CreateVisitChargeDto } from './dto/create-visit-charge.dto';
+import { UpdateChargeStatusDto } from './dto/update-charge-status.dto';
 import { PaymentsService } from './payments.service';
-import { CreatePaymentDto } from './dto/create-payment.dto';
-import { UpdatePaymentDto } from './dto/update-payment.dto';
 
-@Controller('payments')
+@Controller('charges')
 export class PaymentsController {
   constructor(private readonly paymentsService: PaymentsService) {}
 
+  @Get('visit/:visitId')
+  @Roles(RoleGroups.FLOOR_STAFF)
+  billForVisit(@Param('visitId', ParseUUIDPipe) visitId: string) {
+    return this.paymentsService.billForVisit(visitId);
+  }
+
   @Post()
-  create(@Body() createPaymentDto: CreatePaymentDto) {
-    return this.paymentsService.create(createPaymentDto);
+  @Roles(RoleGroups.PROVIDERS)
+  create(@Body() dto: CreateVisitChargeDto, @CurrentUser() user: AuthenticatedUser) {
+    return this.paymentsService.addCharge(dto, user.id);
   }
 
-  @Get()
-  findAll() {
-    return this.paymentsService.findAll();
-  }
-
-  @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.paymentsService.findOne(+id);
-  }
-
-  @Patch(':id')
-  update(@Param('id') id: string, @Body() updatePaymentDto: UpdatePaymentDto) {
-    return this.paymentsService.update(+id, updatePaymentDto);
+  @Patch(':id/status')
+  @Roles(RoleGroups.BILLING)
+  setStatus(@Param('id', ParseUUIDPipe) id: string, @Body() dto: UpdateChargeStatusDto) {
+    return this.paymentsService.setStatus(id, dto.status);
   }
 
   @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.paymentsService.remove(+id);
+  @Roles(RoleGroups.PROVIDERS)
+  remove(@Param('id', ParseUUIDPipe) id: string) {
+    return this.paymentsService.remove(id);
   }
 }

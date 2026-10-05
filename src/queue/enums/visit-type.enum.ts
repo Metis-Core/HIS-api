@@ -9,6 +9,8 @@ export enum VisitIntenentsEnum {
   EXAMINATION = 'triage',
   LAB = 'lab',
   RADIOLOGY = 'radiology',
+  DENTAL = 'dental',
+  ANTENATAL = 'antenatal',
   PHARMACY = 'pharmacy',
   SURGERY = 'surgery',
   POSTOPERATIVE = 'postoperative',

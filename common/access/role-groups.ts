@@ -73,6 +73,13 @@ export const RoleGroups = {
     UserRole.ADMIN,
     UserRole.NURSE,
   ]),
+
+  BILLING: define('Staff permitted to settle or waive visit charges.', [
+    UserRole.SUPER_ADMIN,
+    UserRole.ADMIN,
+    UserRole.ACCOUNTANT,
+    UserRole.RECEPTIONIST,
+  ]),
 } as const satisfies Record<string, RoleGroup>;
 
 export type RoleGroupName = keyof typeof RoleGroups;

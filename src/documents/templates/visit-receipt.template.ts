@@ -1,6 +1,6 @@
-import { Consultation } from 'src/consultation/entities/consultation.entity';
 import { Prescription } from 'src/pharmacy/entities/prescription.entity';
-import { LabOrder } from 'src/lab/entities/lab-order.entity';
+import { VisitCharge } from 'src/payments/entities/visit-charge.entity';
+import { ChargeStatus } from 'src/payments/enums/charge.enum';
 import { Visit } from 'src/queue/entities/visit.entity';
 import {
   baseDocumentStyles,
@@ -13,8 +13,7 @@ import {
 
 interface VisitReceiptContext {
   visit: Visit;
-  consultations: Consultation[];
-  labOrders: LabOrder[];
+  charges: VisitCharge[];
   prescriptions: Prescription[];
 }
 
@@ -26,35 +25,21 @@ interface LineItem {
   total: number;
 }
 
-export function renderVisitReceipt({ visit, consultations, labOrders, prescriptions }: VisitReceiptContext): string {
+export function renderVisitReceipt({ visit, charges, prescriptions }: VisitReceiptContext): string {
   const patient = visit.patient;
   const patientName = patient
     ? [patient.firstName, patient.middleName, patient.lastName].filter(Boolean).join(' ')
     : 'Patient';
 
-  const lines: LineItem[] = [];
-
-  for (const c of consultations) {
-    lines.push({
-      code: `CONS-${c.id.slice(0, 6)}`,
-      label: `${c.type.replaceAll('_', ' ')} consultation — ${c.chiefComplaint}`,
-      qty: 1,
-      unitPrice: 0,
-      total: 0,
-    });
-  }
-
-  for (const o of labOrders) {
-    for (const i of o.items) {
-      lines.push({
-        code: i.test?.code ?? '',
-        label: `Lab: ${i.test?.name ?? 'Test'}`,
-        qty: 1,
-        unitPrice: i.test?.price ?? 0,
-        total: i.test?.price ?? 0,
-      });
-    }
-  }
+  const lines: LineItem[] = charges
+    .filter((c) => c.status !== ChargeStatus.WAIVED)
+    .map((c) => ({
+      code: c.source.toUpperCase(),
+      label: c.description,
+      qty: c.quantity,
+      unitPrice: c.unitPrice,
+      total: c.amount,
+    }));
 
   for (const p of prescriptions) {
     for (const i of p.items) {

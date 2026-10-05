@@ -1,5 +1,7 @@
-import { IsArray, IsEnum, IsOptional, IsUUID } from 'class-validator';
-import { VisitIntenentsEnum, VisitTypeEnum } from 'src/queue/enums/visit-type.enum';
+import { Type } from 'class-transformer';
+import { IsEnum, IsOptional, IsUUID, ValidateNested } from 'class-validator';
+import { VisitTypeEnum } from 'src/queue/enums/visit-type.enum';
+import { InsuranceVerificationDto } from './insurance-verification.dto';
 
 export class CreateVisitDTO {
   @IsUUID()
@@ -9,7 +11,8 @@ export class CreateVisitDTO {
   @IsEnum(VisitTypeEnum)
   visitType?: VisitTypeEnum;
 
-  @IsArray()
-  @IsEnum(VisitIntenentsEnum, { each: true })
-  intent: VisitIntenentsEnum[];
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => InsuranceVerificationDto)
+  insuranceVerification?: InsuranceVerificationDto;
 }

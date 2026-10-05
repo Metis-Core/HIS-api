@@ -141,7 +141,7 @@ export class VisitController {
     }
 
     @Post('/queue/visit/:visitId/append')
-    @Roles(RoleGroups.CLINICAL_STAFF)
+    @Roles(RoleGroups.PROVIDERS)
     async appendVisitIntents(
         @Param('visitId', ParseUUIDPipe) visitId: string,
         @Body('intents') intents: string[],

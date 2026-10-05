@@ -42,11 +42,6 @@ export class CreateInventoryItemDto {
   @IsOptional()
   @IsInt()
   @Min(0)
-  reorderLevel?: number;
-
-  @IsOptional()
-  @IsInt()
-  @Min(0)
   unitPrice?: number;
 
   @IsOptional()

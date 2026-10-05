@@ -25,9 +25,6 @@ export class InventoryItem extends BaseEntity {
   minStockLevel: number;
 
   @Column({ type: 'int', default: 0 })
-  reorderLevel: number;
-
-  @Column({ type: 'int', default: 0 })
   unitPrice: number;
 
   @Column({ type: 'varchar', length: 100, nullable: true })

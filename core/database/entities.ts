@@ -11,6 +11,7 @@ import { LabTest } from 'src/lab/entities/lab-test.entity';
 import { Notification } from 'src/notifications/entities/notification.entity';
 import { OneTimePassword } from 'src/otp/entities/otp.entity';
 import { Patient } from 'src/patients/entities/patient.entity';
+import { VisitCharge } from 'src/payments/entities/visit-charge.entity';
 import { Dispense } from 'src/pharmacy/entities/dispense.entity';
 import { DispenseItem } from 'src/pharmacy/entities/dispense-item.entity';
 import { Prescription } from 'src/pharmacy/entities/prescription.entity';
@@ -44,4 +45,5 @@ export const entities = [
   PrescriptionItem,
   Dispense,
   DispenseItem,
+  VisitCharge,
 ];
