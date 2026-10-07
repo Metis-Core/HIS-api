@@ -10,7 +10,6 @@ import { LabTest } from './entities/lab-test.entity';
 import { LabController } from './lab.controller';
 import { LabOrdersService } from './lab-orders.service';
 import { LabTestsService } from './lab-tests.service';
-import { LabNotificationsListener } from './listeners/lab-notifications.listener';
 
 @Module({
   imports: [
@@ -21,7 +20,7 @@ import { LabNotificationsListener } from './listeners/lab-notifications.listener
     QueueModule,
   ],
   controllers: [LabController],
-  providers: [LabTestsService, LabOrdersService, LabNotificationsListener],
+  providers: [LabTestsService, LabOrdersService],
   exports: [LabTestsService, LabOrdersService],
 })
 export class LabModule {}

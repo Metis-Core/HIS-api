@@ -3,14 +3,18 @@ import {
   Controller,
   Delete,
   Get,
+  Header,
   HttpCode,
   HttpStatus,
+  MessageEvent,
   Param,
   ParseUUIDPipe,
   Patch,
   Post,
   Query,
+  Sse,
 } from '@nestjs/common';
+import { Observable } from 'rxjs';
 import { RoleGroups } from 'common/access/role-groups';
 import { CurrentUser } from 'common/decorators/current-user.decorator';
 import { Roles } from 'common/decorators/roles.decorator';
@@ -19,10 +23,14 @@ import { CreateNotificationDto } from './dto/create-notification.dto';
 import { QueryNotificationsDto } from './dto/query-notifications.dto';
 import { UpdateNotificationDto } from './dto/update-notification.dto';
 import { NotificationsService } from './notifications.service';
+import { NotificationsStreamService } from './notifications-stream.service';
 
 @Controller('notifications')
 export class NotificationsController {
-  constructor(private readonly notificationsService: NotificationsService) {}
+  constructor(
+    private readonly notificationsService: NotificationsService,
+    private readonly streamService: NotificationsStreamService,
+  ) {}
 
   @Post()
   @Roles(RoleGroups.ADMINS)
@@ -48,6 +56,13 @@ export class NotificationsController {
   @Get('me/unread-count')
   countMineUnread(@CurrentUser() user: AuthenticatedUser) {
     return this.notificationsService.countUnread(user.id);
+  }
+
+  @Sse('me/stream')
+  @Header('Cache-Control', 'no-cache, no-transform')
+  @Header('X-Accel-Buffering', 'no')
+  stream(@CurrentUser() user: AuthenticatedUser): Observable<MessageEvent> {
+    return this.streamService.streamFor(user.id);
   }
 
   @Post('me/read-all')

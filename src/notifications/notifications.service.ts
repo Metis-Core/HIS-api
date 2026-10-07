@@ -37,7 +37,7 @@ export class NotificationsService extends BaseCrudService<Notification> {
     const saved = await this.notificationsRepository.save(notification);
     this.eventEmitter.emit(
       NotificationCreatedEvent.name,
-      new NotificationCreatedEvent(saved.id, saved.userId),
+      new NotificationCreatedEvent(saved),
     );
     return saved;
   }

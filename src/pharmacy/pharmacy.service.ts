@@ -28,6 +28,7 @@ import { Prescription } from './entities/prescription.entity';
 import { PrescriptionItemStatus } from './enums/prescription-item-status.enum';
 import { PrescriptionStatus } from './enums/prescription-status.enum';
 import { PrescriptionDispensedEvent } from './events/prescription-dispensed.event';
+import { PrescriptionCreatedEvent } from './events/prescription-created.event';
 
 @Injectable()
 export class PharmacyService extends BaseCrudService<Prescription> {
@@ -70,7 +71,7 @@ export class PharmacyService extends BaseCrudService<Prescription> {
       throw new BadRequestException('One or more items are invalid or inactive');
     }
 
-    return this.dataSource.transaction(async (manager) => {
+    const created = await this.dataSource.transaction(async (manager) => {
       const prescription = manager.create(Prescription, {
         patientId: dto.patientId,
         consultationId: dto.consultationId ?? null,
@@ -111,6 +112,12 @@ export class PharmacyService extends BaseCrudService<Prescription> {
 
       return full;
     });
+
+    this.eventEmitter.emit(
+      PrescriptionCreatedEvent.name,
+      new PrescriptionCreatedEvent(created.id, created.patientId, prescribedById, created.items.length),
+    );
+    return created;
   }
 
   override async findOne(id: string): Promise<Prescription> {

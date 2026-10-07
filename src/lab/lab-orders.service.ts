@@ -26,6 +26,8 @@ import { LabOrderStatus } from './enums/lab-order-status.enum';
 import { LabPriority } from './enums/lab-priority.enum';
 import { LabOrderCreatedEvent } from './events/lab-order-created.event';
 import { LabOrderCompletedEvent } from './events/lab-order-completed.event';
+import { LabOrderCancelledEvent } from './events/lab-order-cancelled.event';
+import { LabResultReadyEvent } from './events/lab-result-ready.event';
 
 @Injectable()
 export class LabOrdersService extends BaseCrudService<LabOrder> {
@@ -205,6 +207,12 @@ export class LabOrdersService extends BaseCrudService<LabOrder> {
       );
 
       return this.findOne(id);
+    }).then((cancelled) => {
+      this.eventEmitter.emit(
+        LabOrderCancelledEvent.name,
+        new LabOrderCancelledEvent(cancelled.id, cancelled.patientId, cancelled.orderedById),
+      );
+      return cancelled;
     });
   }
 
@@ -236,7 +244,23 @@ export class LabOrdersService extends BaseCrudService<LabOrder> {
 
     await this.labOrderItemsRepository.save(item);
     await this.reconcileOrderStatus(orderId);
-    return this.findOne(orderId);
+    const order = await this.findOne(orderId);
+
+    // A fully completed order is announced by LabOrderCompletedEvent instead.
+    if (dto.status === LabOrderItemStatus.RESULT_READY && order.status !== LabOrderStatus.COMPLETED) {
+      this.eventEmitter.emit(
+        LabResultReadyEvent.name,
+        new LabResultReadyEvent(
+          order.id,
+          item.id,
+          order.patientId,
+          order.orderedById,
+          order.items.find((i) => i.id === item.id)?.test?.name ?? 'Lab test',
+          item.isAbnormal,
+        ),
+      );
+    }
+    return order;
   }
 
   private async reconcileOrderStatus(orderId: string): Promise<void> {
@@ -262,7 +286,12 @@ export class LabOrdersService extends BaseCrudService<LabOrder> {
       }
       this.eventEmitter.emit(
         LabOrderCompletedEvent.name,
-        new LabOrderCompletedEvent(order.id, order.patientId, order.orderedById),
+        new LabOrderCompletedEvent(
+          order.id,
+          order.patientId,
+          order.orderedById,
+          items.filter((i) => i.isAbnormal).length,
+        ),
       );
     } else if (anyInProgress && order.status === LabOrderStatus.PENDING) {
       order.status = LabOrderStatus.IN_PROGRESS;
