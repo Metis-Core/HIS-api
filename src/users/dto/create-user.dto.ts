@@ -24,8 +24,7 @@ export class CreateUserDto {
   password: string;
 
   @IsEnum(UserRole)
-  @IsOptional()
-  role?: UserRole;
+  role: UserRole;
 
   @IsEnum(Department)
   department: Department;

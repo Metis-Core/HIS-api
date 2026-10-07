@@ -7,5 +7,4 @@ export enum UserRole {
   PHARMACIST = 'pharmacist',
   RECEPTIONIST = 'receptionist',
   ACCOUNTANT = 'accountant',
-  PATIENT = 'patient',
 }

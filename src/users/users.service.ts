@@ -10,7 +10,6 @@ import { Department } from 'common/enums/department.enum';
 import { AccountStatus } from 'common/enums/userStatus.enum';
 import { UserRole } from 'common/enums/userRoles.enum';
 import { PasswordService } from 'common/services/password.service';
-import { SignupDto } from 'src/auth/dto/signup.dto';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { User } from './entities/user.entity';
@@ -31,22 +30,10 @@ export class UsersService extends BaseCrudService<User> {
       email: createUserDto.email,
       username: createUserDto.username,
       password: createUserDto.password,
-      role: createUserDto.role ?? UserRole.PATIENT,
+      role: createUserDto.role,
       department: createUserDto.department,
       status: createUserDto.status ?? AccountStatus.PENDING_RESET,
       passwordLastChangedAt: null,
-    });
-  }
-
-  async registerPatient(signupDto: SignupDto): Promise<User> {
-    return this.persistUser({
-      email: signupDto.email,
-      username: signupDto.username,
-      password: signupDto.password,
-      role: UserRole.PATIENT,
-      department: Department.RECEPTION,
-      status: AccountStatus.ACTIVE,
-      passwordLastChangedAt: new Date(),
     });
   }
 

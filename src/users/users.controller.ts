@@ -8,12 +8,14 @@ import {
   ParseUUIDPipe,
   Patch,
   Post,
+  Query,
   UseInterceptors,
 } from '@nestjs/common';
 import { RoleGroups } from 'common/access/role-groups';
 import { Roles } from 'common/decorators/roles.decorator';
 import { formatErrorResponse, formatResponse, IPagination } from 'common/response-format';
 import { CreateUserDto } from './dto/create-user.dto';
+import { QueryUsersDto } from './dto/query-users.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { UserResponseDto } from './dto/user-response.dto';
 import { UsersService } from './users.service';
@@ -33,9 +35,16 @@ export class UsersController {
 
   @Get()
   @Roles(RoleGroups.ADMINS)
-  async findAll(): Promise<IPagination<any> | any> {
+  async findAll(@Query() query: QueryUsersDto): Promise<IPagination<any> | any> {
     try {
-      return formatResponse(await this.usersService.findManyWithPagination())
+      const { page = 1, limit = 20, sortOrder = 'DESC' } = query;
+      return formatResponse(
+        await this.usersService.findManyWithPagination({
+          order: { createdAt: sortOrder },
+          skip: (page - 1) * limit,
+          take: limit,
+        }),
+      );
     } catch (error) {
       return formatErrorResponse(error)
     }

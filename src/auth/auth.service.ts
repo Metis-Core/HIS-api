@@ -15,7 +15,6 @@ import { UsersService } from 'src/users/users.service';
 import { User } from 'src/users/entities/user.entity';
 import { AuthTokensDto } from './dto/auth-tokens.dto';
 import { LoginDto } from './dto/login.dto';
-import { SignupDto } from './dto/signup.dto';
 import { AuthToken } from './entities/auth-token.entity';
 import { TokenType } from './enums/authToken.enum';
 
@@ -31,12 +30,6 @@ export class AuthService {
     @InjectRepository(AuthToken)
     private readonly authTokensRepository: Repository<AuthToken>,
   ) { }
-
-  async signup(dto: SignupDto): Promise<AuthTokensDto> {
-    const user = await this.usersService.registerPatient(dto);
-    const { tokens } = await this.issueTokens(user);
-    return tokens;
-  }
 
   async login(dto: LoginDto): Promise<Record<string, any>> {
     const user = await this.usersService.findByEmailOrUsername(dto.identifier);

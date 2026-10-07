@@ -15,7 +15,7 @@ export class User extends BaseEntity {
   @Column({ select: false })
   passwordHash: string;
 
-  @Column({ type: 'enum', enum: UserRole, default: UserRole.PATIENT })
+  @Column({ type: 'enum', enum: UserRole })
   role: UserRole;
 
   @Column({ type: 'enum', enum: Department })

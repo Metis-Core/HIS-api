@@ -21,7 +21,6 @@ const SEED_USERS: readonly SeedUserSpec[] = [
   { key: 'pharmacist', role: UserRole.PHARMACIST, department: Department.MAIN_PHARMACY },
   { key: 'receptionist', role: UserRole.RECEPTIONIST, department: Department.RECEPTION },
   { key: 'accountant', role: UserRole.ACCOUNTANT, department: Department.FINANCE },
-  { key: 'patient', role: UserRole.PATIENT, department: Department.RECEPTION },
 ];
 
 const buildUsername = (key: string): string => `${key}metis`;
