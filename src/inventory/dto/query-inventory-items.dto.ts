@@ -1,4 +1,4 @@
-import { Type } from 'class-transformer';
+import { Transform } from 'class-transformer';
 import { IsBoolean, IsEnum, IsOptional, IsString, MaxLength } from 'class-validator';
 import { BaseFilterDTO } from 'common/dto/filter.dto';
 import { InventoryItemType } from '../enums/inventory-item-type.enum';
@@ -14,7 +14,7 @@ export class QueryInventoryItemsDto extends BaseFilterDTO {
   type?: InventoryItemType;
 
   @IsOptional()
-  @Type(() => Boolean)
+  @Transform(({ value }) => (value === 'false' ? false : value === 'true' ? true : value))
   @IsBoolean()
   isActive?: boolean;
 }

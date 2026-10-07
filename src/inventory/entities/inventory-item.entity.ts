@@ -21,6 +21,12 @@ export class InventoryItem extends BaseEntity {
   @Column({ type: 'enum', enum: UnitOfMeasure, default: UnitOfMeasure.PCS })
   unitOfMeasure: UnitOfMeasure;
 
+  @Column({ type: 'int', default: 1 })
+  packSize: number;
+
+  @Column({ type: 'enum', enum: UnitOfMeasure, default: UnitOfMeasure.BOX })
+  packUnit: UnitOfMeasure;
+
   @Column({ type: 'int', default: 0 })
   minStockLevel: number;
 

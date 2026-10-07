@@ -8,9 +8,12 @@ import {
   Matches,
   MaxLength,
   Min,
+  ValidateNested,
 } from 'class-validator';
+import { Type } from 'class-transformer';
 import { InventoryItemType } from '../enums/inventory-item-type.enum';
 import { UnitOfMeasure } from '../enums/uintMeasure.enum';
+import { InitialStockDto } from './initial-stock.dto';
 
 export class CreateInventoryItemDto {
   @IsString()
@@ -33,6 +36,20 @@ export class CreateInventoryItemDto {
 
   @IsEnum(UnitOfMeasure)
   unitOfMeasure: UnitOfMeasure;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  packSize?: number;
+
+  @IsOptional()
+  @IsEnum(UnitOfMeasure)
+  packUnit?: UnitOfMeasure;
+
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => InitialStockDto)
+  initialStock?: InitialStockDto;
 
   @IsOptional()
   @IsInt()

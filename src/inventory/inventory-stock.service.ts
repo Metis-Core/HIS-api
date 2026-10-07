@@ -14,6 +14,7 @@ import { InventoryStock } from './entities/inventory-stock.entity';
 import { InventoryStore } from './entities/inventory-store.entity';
 import { InventoryTransaction } from './entities/inventory-transaction.entity';
 import { InventoryTransactionType } from './enums/inventoryTransactionType.enum';
+import { QuantityUnit } from './enums/quantity-unit.enum';
 import { StockLowEvent } from './events/stock-low.event';
 
 const NEGATIVE_TXN_TYPES = new Set<InventoryTransactionType>([
@@ -67,63 +68,86 @@ export class InventoryStockService {
   async recordTransaction(
     dto: CreateInventoryTransactionDto,
     performedById: string,
+    manager?: EntityManager,
+  ): Promise<InventoryTransaction> {
+    if (manager) {
+      // Caller owns the transaction and must call notifyIfLow() after it commits.
+      return this.record(manager, dto, performedById);
+    }
+    const txn = await this.dataSource.transaction((m) => this.record(m, dto, performedById));
+    await this.notifyIfLow(txn);
+    return txn;
+  }
+
+  /** Emits a low-stock event only when this movement pushed the balance down to or below the minimum. */
+  async notifyIfLow(txn: InventoryTransaction): Promise<void> {
+    if (!NEGATIVE_TXN_TYPES.has(txn.type)) return;
+    const item = await this.itemsRepository.findOne({ where: { id: txn.itemId } });
+    if (!item) return;
+    const previousBalance = txn.runningBalance + txn.quantity;
+    if (previousBalance > item.minStockLevel && txn.runningBalance <= item.minStockLevel) {
+      this.eventEmitter.emit(
+        StockLowEvent.name,
+        new StockLowEvent(txn.itemId, txn.storeId, txn.runningBalance, item.minStockLevel),
+      );
+    }
+  }
+
+  private async record(
+    manager: EntityManager,
+    dto: CreateInventoryTransactionDto,
+    performedById: string,
   ): Promise<InventoryTransaction> {
     if (dto.quantity <= 0) {
       throw new BadRequestException('Quantity must be positive');
     }
 
-    return this.dataSource.transaction(async (manager) => {
-      const item = await manager.findOne(InventoryItem, { where: { id: dto.itemId } });
-      if (!item) throw new NotFoundException('Inventory item not found');
+    const item = await manager.findOne(InventoryItem, { where: { id: dto.itemId } });
+    if (!item) throw new NotFoundException('Inventory item not found');
 
-      const store = await manager.findOne(InventoryStore, { where: { id: dto.storeId } });
-      if (!store) throw new NotFoundException('Store not found');
+    const store = await manager.findOne(InventoryStore, { where: { id: dto.storeId } });
+    if (!store) throw new NotFoundException('Store not found');
 
-      const primary = await this.applyStockChange(
-        manager,
-        dto.storeId,
-        dto.itemId,
-        dto.type,
-        dto.quantity,
-        performedById,
-        dto,
-      );
+    // Stock is always held in base units (e.g. tablets); packs are converted here.
+    const quantity =
+      dto.quantityUnit === QuantityUnit.PACK ? dto.quantity * item.packSize : dto.quantity;
 
-      if (dto.type === InventoryTransactionType.TRANSFER_OUT) {
-        if (!dto.counterpartStoreId) {
-          throw new BadRequestException('counterpartStoreId is required for transfers');
-        }
-        const counterpart = await manager.findOne(InventoryStore, {
-          where: { id: dto.counterpartStoreId },
-        });
-        if (!counterpart) throw new NotFoundException('Counterpart store not found');
-
-        await this.applyStockChange(
-          manager,
-          dto.counterpartStoreId,
-          dto.itemId,
-          InventoryTransactionType.TRANSFER_IN,
-          dto.quantity,
-          performedById,
-          { ...dto, storeId: dto.counterpartStoreId, counterpartStoreId: dto.storeId },
-        );
+    if (dto.type === InventoryTransactionType.TRANSFER_OUT) {
+      if (!dto.counterpartStoreId) {
+        throw new BadRequestException('counterpartStoreId is required for transfers');
       }
-
-      const updatedStock = await manager.findOneOrFail(InventoryStock, {
-        where: { storeId: dto.storeId, itemId: dto.itemId },
+      if (dto.counterpartStoreId === dto.storeId) {
+        throw new BadRequestException('Cannot transfer stock to the same store');
+      }
+      const counterpart = await manager.findOne(InventoryStore, {
+        where: { id: dto.counterpartStoreId },
       });
-      if (
-        updatedStock.quantity <= item.minStockLevel &&
-        NEGATIVE_TXN_TYPES.has(dto.type)
-      ) {
-        this.eventEmitter.emit(
-          StockLowEvent.name,
-          new StockLowEvent(dto.itemId, dto.storeId, updatedStock.quantity, item.minStockLevel),
-        );
-      }
+      if (!counterpart) throw new NotFoundException('Counterpart store not found');
+    }
 
-      return primary;
-    });
+    const primary = await this.applyStockChange(
+      manager,
+      item,
+      dto.storeId,
+      dto.type,
+      quantity,
+      performedById,
+      dto,
+    );
+
+    if (dto.type === InventoryTransactionType.TRANSFER_OUT) {
+      await this.applyStockChange(
+        manager,
+        item,
+        dto.counterpartStoreId!,
+        InventoryTransactionType.TRANSFER_IN,
+        quantity,
+        performedById,
+        { ...dto, storeId: dto.counterpartStoreId!, counterpartStoreId: dto.storeId },
+      );
+    }
+
+    return primary;
   }
 
   async searchTransactions(
@@ -166,14 +190,19 @@ export class InventoryStockService {
 
   private async applyStockChange(
     manager: EntityManager,
+    item: InventoryItem,
     storeId: string,
-    itemId: string,
     type: InventoryTransactionType,
     quantity: number,
     performedById: string,
     dto: CreateInventoryTransactionDto,
   ): Promise<InventoryTransaction> {
-    let stock = await manager.findOne(InventoryStock, { where: { storeId, itemId } });
+    const itemId = item.id;
+    // Row lock serialises concurrent movements so balances can't be double-spent.
+    let stock = await manager.findOne(InventoryStock, {
+      where: { storeId, itemId },
+      lock: { mode: 'pessimistic_write' },
+    });
     if (!stock) {
       stock = manager.create(InventoryStock, { storeId, itemId, quantity: 0 });
       stock = await manager.save(stock);
@@ -191,7 +220,9 @@ export class InventoryStockService {
 
     const newBalance = stock.quantity + delta;
     if (newBalance < 0) {
-      throw new BadRequestException('Insufficient stock');
+      throw new BadRequestException(
+        `Insufficient stock for ${item.name}: ${stock.quantity} available, ${quantity} requested`,
+      );
     }
 
     stock.quantity = newBalance;

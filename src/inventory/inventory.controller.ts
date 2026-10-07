@@ -26,6 +26,7 @@ import { UpdateInventoryStoreDto } from './dto/update-inventory-store.dto';
 import { InventoryItemsService } from './inventory-items.service';
 import { InventoryStockService } from './inventory-stock.service';
 import { InventoryStoresService } from './inventory-stores.service';
+import { InventoryTransactionType } from './enums/inventoryTransactionType.enum';
 
 @Controller('inventory')
 export class InventoryController {
@@ -38,8 +39,26 @@ export class InventoryController {
   @Post('items')
   @Roles(RoleGroups.ADMINS)
   @HttpCode(HttpStatus.CREATED)
-  createItem(@Body() dto: CreateInventoryItemDto) {
-    return this.itemsService.create(dto);
+  async createItem(
+    @Body() dto: CreateInventoryItemDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    const { initialStock, ...itemDto } = dto;
+    if (initialStock) await this.storesService.findOne(initialStock.storeId);
+
+    const item = await this.itemsService.create(itemDto);
+    if (initialStock) {
+      await this.stockService.recordTransaction(
+        {
+          ...initialStock,
+          itemId: item.id,
+          type: InventoryTransactionType.RECEIPT,
+          notes: 'Opening stock',
+        },
+        user.id,
+      );
+    }
+    return item;
   }
 
   @Get('items')

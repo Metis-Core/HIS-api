@@ -12,6 +12,7 @@ import { IPagination } from 'common/response-format';
 import { Department } from 'common/enums/department.enum';
 import { InventoryStockService } from 'src/inventory/inventory-stock.service';
 import { InventoryItem } from 'src/inventory/entities/inventory-item.entity';
+import { InventoryTransaction } from 'src/inventory/entities/inventory-transaction.entity';
 import { InventoryTransactionType } from 'src/inventory/enums/inventoryTransactionType.enum';
 import { PatientsService } from 'src/patients/patients.service';
 import { QueueEntriesService } from 'src/queue/queue-entries.service';
@@ -204,7 +205,9 @@ export class PharmacyService extends BaseCrudService<Prescription> {
       }
     }
 
-    return this.dataSource.transaction(async (manager) => {
+    const issued: InventoryTransaction[] = [];
+
+    const result = await this.dataSource.transaction(async (manager) => {
       const dispense = manager.create(Dispense, {
         prescriptionId,
         dispensedById,
@@ -230,7 +233,7 @@ export class PharmacyService extends BaseCrudService<Prescription> {
             : PrescriptionItemStatus.PARTIAL;
         await manager.save(pi);
 
-        await this.stockService.recordTransaction(
+        const txn = await this.stockService.recordTransaction(
           {
             storeId: dto.storeId,
             itemId: pi.itemId,
@@ -240,7 +243,9 @@ export class PharmacyService extends BaseCrudService<Prescription> {
             referenceId: prescriptionId,
           },
           dispensedById,
+          manager,
         );
+        issued.push(txn);
       }
       await manager.save(dispenseItems);
 
@@ -277,6 +282,11 @@ export class PharmacyService extends BaseCrudService<Prescription> {
       );
       return full;
     });
+
+    for (const txn of issued) {
+      await this.stockService.notifyIfLow(txn);
+    }
+    return result;
   }
 
   async listDispensesFor(prescriptionId: string): Promise<Dispense[]> {

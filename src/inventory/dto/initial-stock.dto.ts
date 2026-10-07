@@ -8,44 +8,19 @@ import {
   IsUUID,
   MaxLength,
 } from 'class-validator';
-import { InventoryTransactionType } from '../enums/inventoryTransactionType.enum';
 import { QuantityUnit } from '../enums/quantity-unit.enum';
 
-export class CreateInventoryTransactionDto {
+export class InitialStockDto {
   @IsUUID()
   storeId: string;
-
-  @IsUUID()
-  itemId: string;
-
-  @IsEnum(InventoryTransactionType)
-  type: InventoryTransactionType;
 
   @IsInt()
   @IsPositive()
   quantity: number;
 
-  // PACK multiplies quantity by the item's packSize; defaults to UNIT.
   @IsOptional()
   @IsEnum(QuantityUnit)
   quantityUnit?: QuantityUnit;
-
-  @IsOptional()
-  @IsUUID()
-  counterpartStoreId?: string;
-
-  @IsOptional()
-  @IsString()
-  @MaxLength(100)
-  referenceType?: string;
-
-  @IsOptional()
-  @IsUUID()
-  referenceId?: string;
-
-  @IsOptional()
-  @IsString()
-  notes?: string;
 
   @IsOptional()
   @IsString()
