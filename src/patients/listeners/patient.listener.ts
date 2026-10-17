@@ -12,20 +12,18 @@ export class PatientListener {
 
   @OnEvent(PatientCreatedEvent.channel)
   onCreated(event: PatientCreatedEvent): void {
-    this.logger.log(
-      `Patient registered: ${event.data.mrn} (${event.data.fullName})`,
-    );
+    this.logger.log(`Patient registered: ${event.data.patientId}`);
   }
 
   @OnEvent(PatientStatusChangedEvent.channel)
   onStatusChanged(event: PatientStatusChangedEvent): void {
     this.logger.log(
-      `Patient ${event.data.mrn} status ${event.previousStatus} -> ${event.data.status}`,
+      `Patient ${event.data.patientId} status ${event.previousStatus} -> ${event.data.status}`,
     );
   }
 
   @OnEvent(PatientDeletedEvent.channel)
   onDeleted(event: PatientDeletedEvent): void {
-    this.logger.log(`Patient removed: ${event.data.mrn}`);
+    this.logger.log(`Patient removed: ${event.data.patientId}`);
   }
 }
