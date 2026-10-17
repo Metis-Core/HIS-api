@@ -92,7 +92,9 @@ export class CreateVisitQueue1785496982007 implements MigrationInterface {
     );
     await queryRunner.query(`DROP TABLE "queue_entries"`);
     await queryRunner.query(`DROP TYPE "public"."queue_entries_status_enum"`);
-    await queryRunner.query(`DROP TYPE "public"."queue_entries_department_enum"`);
+    await queryRunner.query(
+      `DROP TYPE "public"."queue_entries_department_enum"`,
+    );
     await queryRunner.query(
       `DROP INDEX "public"."IDX_0acbb82019b28e644a6bbf96c7"`,
     );
@@ -106,7 +108,9 @@ export class CreateVisitQueue1785496982007 implements MigrationInterface {
       `DROP INDEX "public"."IDX_bfa22b367f591db46d899afd82"`,
     );
     await queryRunner.query(`DROP TABLE "visits"`);
-    await queryRunner.query(`DROP TYPE "public"."visits_currentdepartment_enum"`);
+    await queryRunner.query(
+      `DROP TYPE "public"."visits_currentdepartment_enum"`,
+    );
     await queryRunner.query(`DROP TYPE "public"."visits_status_enum"`);
     await queryRunner.query(`DROP TYPE "public"."visits_visittype_enum"`);
   }

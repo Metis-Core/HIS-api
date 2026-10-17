@@ -27,7 +27,9 @@ export class AddMedicationAndLabResultSchema1789600000000 implements MigrationIn
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
-    await queryRunner.query(`ALTER TABLE "lab_tests" DROP COLUMN IF EXISTS "resultSchema"`);
+    await queryRunner.query(
+      `ALTER TABLE "lab_tests" DROP COLUMN IF EXISTS "resultSchema"`,
+    );
     await queryRunner.query(`
       ALTER TABLE "inventory_transactions"
         DROP COLUMN IF EXISTS "batchNumber",
