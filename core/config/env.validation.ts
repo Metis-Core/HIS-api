@@ -75,6 +75,20 @@ export class EnvironmentVariablesDTO {
   DB_RUN_MIGRATIONS?: string;
 
   @IsOptional()
+  @IsInt({ message: 'THROTTLE_AUTH_LIMIT must be an integer' })
+  @Min(1)
+  THROTTLE_AUTH_LIMIT?: number;
+
+  @IsOptional()
+  @IsInt({ message: 'THROTTLE_AUTH_TTL_SECONDS must be an integer' })
+  @Min(1)
+  THROTTLE_AUTH_TTL_SECONDS?: number;
+
+  @IsOptional()
+  @IsString()
+  TRUST_PROXY?: string;
+
+  @IsOptional()
   @IsString()
   JWT_ACCESS_EXPIRES_IN?: string;
 

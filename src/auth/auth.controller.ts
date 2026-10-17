@@ -1,3 +1,4 @@
+import { AuthThrottlerGuard } from 'core/security/auth-throttler.guard';
 import {
   Body,
   Controller,
@@ -25,6 +26,7 @@ export class AuthController {
   @Public()
   @HttpCode(HttpStatus.OK)
   @Post('login')
+  @UseGuards(AuthThrottlerGuard)
   login(@Body() loginDto: LoginDto) {
     return this.authService.login(loginDto);
   }
@@ -53,6 +55,7 @@ export class AuthController {
 
   @HttpCode(HttpStatus.OK)
   @Post('change-password')
+  @UseGuards(AuthThrottlerGuard)
   changePassword(
     @CurrentUser() user: AuthenticatedUser,
     @Body() dto: ChangePasswordDTO,

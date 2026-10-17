@@ -3,6 +3,7 @@ import { APP_FILTER, APP_GUARD } from '@nestjs/core';
 import { AllExceptionsFilter } from 'common/filters/all-exceptions.filter';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { DatabaseModule } from 'core/database/database.module';
+import { SecurityModule } from 'core/security/security.module';
 import { JwtAuthGuard } from 'core/guards/jwt-auth.guard';
 import { RolesGuard } from 'core/guards/roles.guard';
 import { AppController } from './app.controller';
@@ -29,6 +30,7 @@ import { DocumentsModule } from './documents/documents.module';
   imports: [
     EventEmitterModule.forRoot({ wildcard: true }),
     DatabaseModule,
+    SecurityModule,
     AuthModule,
     UsersModule,
     PharmacyModule,

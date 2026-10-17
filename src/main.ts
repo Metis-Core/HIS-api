@@ -1,16 +1,11 @@
 import { ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
+import { applyHttpHardening } from 'core/security/http-hardening';
 import { AppModule } from './app.module';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
-
-  app.enableCors({
-    origin: '*',
-    credentials: true,
-    methods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
-  });
+  applyHttpHardening(app);
 
   app.useGlobalPipes(
     new ValidationPipe({
@@ -23,4 +18,4 @@ async function bootstrap() {
   await app.listen(process.env.PORT ?? 8000);
 }
 
-bootstrap();
+void bootstrap();
