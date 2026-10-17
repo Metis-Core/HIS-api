@@ -9,7 +9,10 @@ describe('ConsultationController', () => {
     const module: TestingModule = await Test.createTestingModule({
       controllers: [ConsultationController],
       providers: [ConsultationService],
-    }).compile();
+    })
+      // Scaffold smoke test: stub every injected dependency.
+      .useMocker(() => ({}))
+      .compile();
 
     controller = module.get<ConsultationController>(ConsultationController);
   });

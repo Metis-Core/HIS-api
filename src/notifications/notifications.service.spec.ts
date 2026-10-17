@@ -7,7 +7,10 @@ describe('NotificationsService', () => {
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [NotificationsService],
-    }).compile();
+    })
+      // Scaffold smoke test: stub every injected dependency.
+      .useMocker(() => ({}))
+      .compile();
 
     service = module.get<NotificationsService>(NotificationsService);
   });
