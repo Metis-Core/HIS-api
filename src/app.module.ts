@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
-import { APP_GUARD } from '@nestjs/core';
+import { APP_FILTER, APP_GUARD } from '@nestjs/core';
+import { AllExceptionsFilter } from 'common/filters/all-exceptions.filter';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { DatabaseModule } from 'core/database/database.module';
 import { JwtAuthGuard } from 'core/guards/jwt-auth.guard';
@@ -49,6 +50,7 @@ import { DocumentsModule } from './documents/documents.module';
   controllers: [AppController],
   providers: [
     AppService,
+    { provide: APP_FILTER, useClass: AllExceptionsFilter },
     { provide: APP_GUARD, useClass: JwtAuthGuard },
     { provide: APP_GUARD, useClass: RolesGuard },
   ],

@@ -18,10 +18,7 @@ import { CreatePatientDto } from './dto/create-patient.dto';
 import { PatientFiltersDto } from './dto/patient-filters.dto';
 import { UpdatePatientDto } from './dto/update-patient.dto';
 import { PatientsService } from './patients.service';
-import {
-  formatErrorResponse,
-  formatResponse,
-} from '../../common/response-format';
+import { formatResponse } from '../../common/response-format';
 
 @Controller('patients')
 export class PatientsController {
