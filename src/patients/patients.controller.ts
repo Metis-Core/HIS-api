@@ -34,11 +34,8 @@ export class PatientsController {
 
   @Get()
   @Roles(RoleGroups.FLOOR_STAFF)
-  async findAll() {
-    const patients = await this.patientsService.findManyWithPagination({
-      relations: { contact: true },
-    });
-    return formatResponse(patients);
+  async findAll(@Query() query: PatientFiltersDto) {
+    return formatResponse(await this.patientsService.search(query));
   }
 
   @Get(':id')

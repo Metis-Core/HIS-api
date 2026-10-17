@@ -1,12 +1,9 @@
-import {
-  ConflictException,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { ConflictException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import {
   Between,
+  Brackets,
   FindOptionsWhere,
   ILike,
   LessThanOrEqual,
@@ -27,7 +24,18 @@ import {
 } from './events/patient.events';
 import { ContactsService } from '../contacts/contacts.service';
 import { BaseCrudService } from '../../common/services/crud.service';
-import { IPagination } from '../../common/response-format';
+import { buildPaginationMeta, IPagination } from '../../common/response-format';
+import { containsPattern } from '../../common/utils/like-pattern';
+
+const SEARCHABLE_FIELDS = [
+  'firstName',
+  'middleName',
+  'lastName',
+  'mrn',
+  'phone',
+  'email',
+  'nationalId',
+] as const;
 
 @Injectable()
 export class PatientsService extends BaseCrudService<Patient> {
@@ -37,7 +45,7 @@ export class PatientsService extends BaseCrudService<Patient> {
     private readonly contactService: ContactsService,
     private readonly events: EventEmitter2,
   ) {
-    super(patientsRepository)
+    super(patientsRepository);
   }
 
   private emit(event: PatientEvent): void {
@@ -67,17 +75,17 @@ export class PatientsService extends BaseCrudService<Patient> {
     );
 
     if (emergencyContact) {
-      await this.contactService.create({ patientId: patient.id, ...emergencyContact });
+      await this.contactService.create({
+        patientId: patient.id,
+        ...emergencyContact,
+      });
     }
 
     this.emit(new PatientCreatedEvent(toPatientEventData(patient)));
     return patient;
   }
 
-  override async update(
-    id: string,
-    dto: UpdatePatientDto,
-  ): Promise<Patient> {
+  override async update(id: string, dto: UpdatePatientDto): Promise<Patient> {
     const existing = await this.findOne(id);
     const { emergencyContact, ...rest } = dto;
     await super.update(id, rest);
@@ -106,34 +114,39 @@ export class PatientsService extends BaseCrudService<Patient> {
   }
 
   async search(query: PatientFiltersDto): Promise<IPagination<Patient>> {
-    const { page = 1, limit = 20, sortOrder = 'DESC', search, ...filters } = query;
-    const base = this.buildWhere(filters);
-    const term = search?.trim();
+    const {
+      page = 1,
+      limit = 20,
+      sortOrder = 'DESC',
+      search,
+      ...filters
+    } = query;
+    const skip = (page - 1) * limit;
+    const qb = this.patientsRepository
+      .createQueryBuilder('patient')
+      .leftJoinAndSelect('patient.contact', 'contact')
+      .where(this.buildWhere(filters))
+      .orderBy('patient.createdAt', sortOrder)
+      .skip(skip)
+      .take(limit);
 
-    return this.findManyWithPagination({
-      where: term ? this.withSearch(base, term) : base,
-      order: { createdAt: sortOrder },
-      skip: (page - 1) * limit,
-      take: limit,
-      relations: { contact: true },
+    // Every word must match some identifying field, so "jane nakato" finds Jane Nakato.
+    const words = search?.trim().split(/\s+/).filter(Boolean) ?? [];
+    words.forEach((word, index) => {
+      const param = `term${index}`;
+      qb.andWhere(
+        new Brackets((sub) => {
+          SEARCHABLE_FIELDS.forEach((field) =>
+            sub.orWhere(`patient.${field} ILIKE :${param}`, {
+              [param]: containsPattern(word),
+            }),
+          );
+        }),
+      );
     });
-  }
 
-  private withSearch(
-    base: FindOptionsWhere<Patient>,
-    term: string,
-  ): FindOptionsWhere<Patient>[] {
-    const like = ILike(`%${term}%`);
-    const fields: (keyof Patient)[] = [
-      'firstName',
-      'middleName',
-      'lastName',
-      'mrn',
-      'phone',
-      'email',
-      'nationalId',
-    ];
-    return fields.map((field) => ({ ...base, [field]: like }));
+    const [items, total] = await qb.getManyAndCount();
+    return { items, total, meta: buildPaginationMeta(total, skip, limit) };
   }
 
   private buildWhere(
@@ -146,16 +159,37 @@ export class PatientsService extends BaseCrudService<Patient> {
     if (filters.gender) base.gender = filters.gender;
     if (filters.bloodType) base.bloodType = filters.bloodType;
     if (filters.maritalStatus) base.maritalStatus = filters.maritalStatus;
-    if (filters.city?.trim()) base.city = ILike(`%${filters.city.trim()}%`);
+    if (filters.city?.trim())
+      base.city = ILike(containsPattern(filters.city.trim()));
 
     if (filters.dateOfBirthFrom && filters.dateOfBirthTo) {
-      base.dateOfBirth = Between(filters.dateOfBirthFrom, filters.dateOfBirthTo);
+      base.dateOfBirth = Between(
+        filters.dateOfBirthFrom,
+        filters.dateOfBirthTo,
+      );
     } else if (filters.dateOfBirthFrom) {
       base.dateOfBirth = MoreThanOrEqual(filters.dateOfBirthFrom);
     } else if (filters.dateOfBirthTo) {
       base.dateOfBirth = LessThanOrEqual(filters.dateOfBirthTo);
     }
 
+    const createdAt = this.dateRange(
+      filters.registeredFrom,
+      filters.registeredTo,
+    );
+    if (createdAt) base.createdAt = createdAt;
+
     return base;
+  }
+
+  private dateRange(from?: string, to?: string) {
+    const start = from
+      ? new Date(`${from.slice(0, 10)}T00:00:00.000Z`)
+      : undefined;
+    const end = to ? new Date(`${to.slice(0, 10)}T23:59:59.999Z`) : undefined;
+    if (start && end) return Between(start, end);
+    if (start) return MoreThanOrEqual(start);
+    if (end) return LessThanOrEqual(end);
+    return undefined;
   }
 }
