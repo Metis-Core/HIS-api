@@ -1,18 +1,23 @@
 import {
+  BadRequestException,
   ConflictException,
   ForbiddenException,
   Injectable,
   UnauthorizedException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { FindOptionsWhere, ILike, Repository } from 'typeorm';
+import { IPagination } from 'common/response-format';
 import { Department } from 'common/enums/department.enum';
 import { AccountStatus } from 'common/enums/userStatus.enum';
 import { UserRole } from 'common/enums/userRoles.enum';
 import { PasswordService } from 'common/services/password.service';
 import { CreateUserDto } from './dto/create-user.dto';
+import { QueryUsersDto } from './dto/query-users.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
+import type { AuthenticatedUser } from 'common/interfaces/authenticated-user.interface';
 import { User } from './entities/user.entity';
+import { assertCanDelete, assertCanManage } from './user-access.policy';
 import { BaseCrudService } from '../../common/services/crud.service';
 
 @Injectable()
@@ -22,7 +27,7 @@ export class UsersService extends BaseCrudService<User> {
     private readonly usersRepository: Repository<User>,
     private readonly passwordService: PasswordService,
   ) {
-    super(usersRepository)
+    super(usersRepository);
   }
 
   async create(createUserDto: CreateUserDto): Promise<User> {
@@ -34,6 +39,36 @@ export class UsersService extends BaseCrudService<User> {
       department: createUserDto.department,
       status: createUserDto.status ?? AccountStatus.PENDING_RESET,
       passwordLastChangedAt: null,
+    });
+  }
+
+  async search(query: QueryUsersDto): Promise<IPagination<User>> {
+    const {
+      page = 1,
+      limit = 20,
+      sortOrder = 'DESC',
+      role,
+      department,
+      status,
+    } = query;
+    const base: FindOptionsWhere<User> = {
+      ...(role ? { role } : {}),
+      ...(department ? { department } : {}),
+      ...(status ? { status } : {}),
+    };
+    const term = query.search?.trim();
+    const where = term
+      ? [
+          { ...base, username: ILike(`%${term}%`) },
+          { ...base, email: ILike(`%${term}%`) },
+        ]
+      : base;
+
+    return this.findManyWithPagination({
+      where,
+      order: { createdAt: sortOrder },
+      skip: (page - 1) * limit,
+      take: limit,
     });
   }
 
@@ -52,19 +87,22 @@ export class UsersService extends BaseCrudService<User> {
       .getOne();
   }
 
-  async update(id: string, updateUserDto: UpdateUserDto): Promise<User> {
+  async updateAsActor(
+    id: string,
+    updateUserDto: UpdateUserDto,
+    actor: AuthenticatedUser,
+  ): Promise<User> {
     const user = await this.findOne(id);
+    assertCanManage(actor, user, updateUserDto);
 
     if (updateUserDto.password) {
       user.passwordHash = await this.passwordService.hash(
         updateUserDto.password,
       );
       user.passwordLastChangedAt = new Date();
-      if (user.status === AccountStatus.PENDING_RESET) {
-        user.status = AccountStatus.ACTIVE;
-      }
+      // An admin-set password is temporary; the owner must choose their own.
+      user.status = AccountStatus.PENDING_RESET;
     }
-
     if (updateUserDto.email) {
       user.email = updateUserDto.email.toLowerCase();
     }
@@ -77,12 +115,46 @@ export class UsersService extends BaseCrudService<User> {
     if (updateUserDto.department) {
       user.department = updateUserDto.department;
     }
-    if (updateUserDto.status) {
+    if (updateUserDto.status && !updateUserDto.password) {
       user.status = updateUserDto.status;
     }
 
     await this.usersRepository.save(user);
     return this.findOne(id);
+  }
+
+  async removeAsActor(id: string, actor: AuthenticatedUser): Promise<void> {
+    const user = await this.findOne(id);
+    assertCanDelete(actor, user);
+    await this.remove(id);
+  }
+
+  async changeOwnPassword(
+    userId: string,
+    currentPassword: string,
+    newPassword: string,
+  ): Promise<void> {
+    const user = await this.usersRepository
+      .createQueryBuilder('user')
+      .addSelect('user.passwordHash')
+      .where('user.id = :userId', { userId })
+      .getOne();
+    // 400 rather than 401 so the client does not treat it as an expired session.
+    if (!user || !(await this.verifyPassword(user, currentPassword))) {
+      throw new BadRequestException('Current password is incorrect');
+    }
+    if (currentPassword === newPassword) {
+      throw new BadRequestException(
+        'New password must differ from the current password',
+      );
+    }
+
+    user.passwordHash = await this.passwordService.hash(newPassword);
+    user.passwordLastChangedAt = new Date();
+    if (user.status === AccountStatus.PENDING_RESET) {
+      user.status = AccountStatus.ACTIVE;
+    }
+    await this.usersRepository.save(user);
   }
 
   assertAccountUsable(user: User): void {

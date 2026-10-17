@@ -15,6 +15,7 @@ import { UsersService } from 'src/users/users.service';
 import { User } from 'src/users/entities/user.entity';
 import { UserResponseDto } from 'src/users/dto/user-response.dto';
 import { AuthTokensDto } from './dto/auth-tokens.dto';
+import { ChangePasswordDTO } from './dto/change-password.dto';
 import { LoginDto } from './dto/login.dto';
 import { AuthToken } from './entities/auth-token.entity';
 import { TokenType } from './enums/authToken.enum';
@@ -110,6 +111,23 @@ export class AuthService {
     }
 
     await this.revokeAllRefreshTokens(userId);
+  }
+
+  async changePassword(
+    userId: string,
+    dto: ChangePasswordDTO,
+  ): Promise<AuthTokensDto> {
+    await this.usersService.changeOwnPassword(
+      userId,
+      dto.currentPassword,
+      dto.newPassword,
+    );
+    // Sign out every other session, then hand this one fresh tokens.
+    await this.revokeAllRefreshTokens(userId);
+    const { tokens } = await this.issueTokens(
+      await this.usersService.findOne(userId),
+    );
+    return tokens;
   }
 
   async me(userId: string): Promise<UserResponseDto> {
