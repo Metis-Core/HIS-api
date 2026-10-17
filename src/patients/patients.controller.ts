@@ -66,7 +66,7 @@ export class PatientsController {
   }
 
   @Delete(':id')
-  @Roles(RoleGroups.RECEPTION)
+  @Roles(RoleGroups.ADMINS)
   remove(@Param('id', ParseUUIDPipe) id: string) {
     return this.patientsService.remove(id);
   }

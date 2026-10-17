@@ -57,6 +57,7 @@ export class PatientsService extends BaseCrudService<Patient> {
 
     if (rest.phone || rest.email || rest.nationalId) {
       const duplicate = await this.patientsRepository.findOne({
+        withDeleted: true,
         where: [
           ...(rest.phone ? [{ phone: rest.phone }] : []),
           ...(rest.email ? [{ email: rest.email }] : []),
@@ -107,9 +108,10 @@ export class PatientsService extends BaseCrudService<Patient> {
     return updated;
   }
 
+  // Clinical records are kept; deleting a patient only archives the row.
   override async remove(id: string): Promise<void> {
     const patient = await this.findOne(id);
-    await super.remove(id);
+    await this.patientsRepository.softDelete(id);
     this.emit(new PatientDeletedEvent(toPatientEventData(patient)));
   }
 

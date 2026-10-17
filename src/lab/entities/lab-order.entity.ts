@@ -18,7 +18,7 @@ import { LabOrderItem } from './lab-order-item.entity';
 @Entity('lab_orders')
 @Index(['patientId', 'status'])
 export class LabOrder extends BaseEntity {
-  @ManyToOne(() => Patient, { onDelete: 'CASCADE' })
+  @ManyToOne(() => Patient, { onDelete: 'RESTRICT' })
   @JoinColumn({ name: 'patientId' })
   patient: Patient;
 
@@ -46,7 +46,11 @@ export class LabOrder extends BaseEntity {
   @Column({ type: 'uuid' })
   orderedById: string;
 
-  @Column({ type: 'enum', enum: LabOrderStatus, default: LabOrderStatus.PENDING })
+  @Column({
+    type: 'enum',
+    enum: LabOrderStatus,
+    default: LabOrderStatus.PENDING,
+  })
   status: LabOrderStatus;
 
   @Column({ type: 'enum', enum: LabPriority, default: LabPriority.ROUTINE })

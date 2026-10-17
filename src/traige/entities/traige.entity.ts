@@ -1,10 +1,4 @@
-import {
-  Column,
-  Entity,
-  Index,
-  JoinColumn,
-  ManyToOne,
-} from 'typeorm';
+import { Column, Entity, Index, JoinColumn, ManyToOne } from 'typeorm';
 import { BaseEntity } from 'common/entities/base.entity';
 import { Department } from 'common/enums/department.enum';
 import { Patient } from 'src/patients/entities/patient.entity';
@@ -19,7 +13,7 @@ export class Triage extends BaseEntity {
   @Column({ type: 'uuid' })
   patientId: string;
 
-  @ManyToOne(() => Patient, { onDelete: 'CASCADE' })
+  @ManyToOne(() => Patient, { onDelete: 'RESTRICT' })
   @JoinColumn({ name: 'patientId' })
   patient: Patient;
 
