@@ -8,6 +8,8 @@ import { LabOrderItem } from './entities/lab-order-item.entity';
 import { LabOrder } from './entities/lab-order.entity';
 import { LabResultAmendment } from './entities/lab-result-amendment.entity';
 import { LabTest } from './entities/lab-test.entity';
+import { LabBoardController } from './lab-board.controller';
+import { LabBoardService } from './lab-board.service';
 import { LabController } from './lab.controller';
 import { LabOrderIntakeService } from './lab-order-intake.service';
 import { LabOrdersService } from './lab-orders.service';
@@ -30,7 +32,7 @@ import { LabTestsService } from './lab-tests.service';
     NotificationsModule,
     QueueModule,
   ],
-  controllers: [LabController, LabResultsController],
+  controllers: [LabController, LabResultsController, LabBoardController],
   providers: [
     LabTestsService,
     LabOrdersService,
@@ -38,6 +40,7 @@ import { LabTestsService } from './lab-tests.service';
     LabResultsService,
     LabOrderProgressService,
     LabAmendmentsService,
+    LabBoardService,
   ],
   exports: [LabTestsService, LabOrdersService, LabOrderIntakeService],
 })
