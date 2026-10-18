@@ -5,6 +5,7 @@ import {
   Get,
   HttpCode,
   HttpStatus,
+  Patch,
   Post,
   Req,
   UseGuards,
@@ -18,6 +19,7 @@ import { AuthService } from './auth.service';
 import { ChangePasswordDTO } from './dto/change-password.dto';
 import { LoginDto } from './dto/login.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
+import { UpdateProfileDTO } from './dto/update-profile.dto';
 
 @Controller('auth')
 export class AuthController {
@@ -66,5 +68,14 @@ export class AuthController {
   @Get('me')
   me(@CurrentUser() user: AuthenticatedUser) {
     return this.authService.me(user.id);
+  }
+
+  @Patch('me')
+  @UseGuards(AuthThrottlerGuard)
+  updateMe(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() dto: UpdateProfileDTO,
+  ) {
+    return this.authService.updateProfile(user.id, dto);
   }
 }

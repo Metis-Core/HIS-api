@@ -157,6 +157,28 @@ export class UsersService extends BaseCrudService<User> {
     await this.usersRepository.save(user);
   }
 
+  async updateOwnProfile(
+    userId: string,
+    changes: { username: string; currentPassword: string },
+  ): Promise<User> {
+    const { username } = changes;
+    const user = await this.usersRepository
+      .createQueryBuilder('user')
+      .addSelect('user.passwordHash')
+      .where('user.id = :userId', { userId })
+      .getOne();
+    if (!user || !(await this.verifyPassword(user, changes.currentPassword))) {
+      throw new BadRequestException('Current password is incorrect');
+    }
+    const clash = await this.usersRepository.findOne({ where: { username } });
+    if (clash && clash.id !== userId) {
+      throw new ConflictException('Username already in use');
+    }
+    user.username = username;
+    await this.usersRepository.save(user);
+    return this.findOne(userId);
+  }
+
   assertAccountUsable(user: User): void {
     if (
       user.status === AccountStatus.SUSPENDED ||

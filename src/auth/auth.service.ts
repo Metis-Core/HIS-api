@@ -15,6 +15,7 @@ import { UsersService } from 'src/users/users.service';
 import { User } from 'src/users/entities/user.entity';
 import { UserResponseDto } from 'src/users/dto/user-response.dto';
 import { AuthTokensDto } from './dto/auth-tokens.dto';
+import { UpdateProfileDTO } from './dto/update-profile.dto';
 import { ChangePasswordDTO } from './dto/change-password.dto';
 import { LoginDto } from './dto/login.dto';
 import { AuthToken } from './entities/auth-token.entity';
@@ -128,6 +129,15 @@ export class AuthService {
       await this.usersService.findOne(userId),
     );
     return tokens;
+  }
+
+  async updateProfile(
+    userId: string,
+    dto: UpdateProfileDTO,
+  ): Promise<UserResponseDto> {
+    return UserResponseDto.fromEntity(
+      await this.usersService.updateOwnProfile(userId, dto),
+    );
   }
 
   async me(userId: string): Promise<UserResponseDto> {
