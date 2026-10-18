@@ -5,5 +5,6 @@ export class LabOrderCompletedEvent {
     public readonly patientId: string,
     public readonly orderedById: string,
     public readonly abnormalCount = 0,
+    public readonly criticalCount = 0,
   ) {}
 }

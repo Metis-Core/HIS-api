@@ -1,5 +1,5 @@
 import {
-  IsEnum,
+  IsIn,
   IsObject,
   IsOptional,
   IsString,
@@ -8,10 +8,14 @@ import {
 import { LabOrderItemStatus } from '../enums/lab-order-item-status.enum';
 import type { LabResultData } from '../results/result-schema.types';
 
+const SETTABLE = Object.values(LabOrderItemStatus).filter(
+  (s) => s !== LabOrderItemStatus.VERIFIED,
+);
+
 export class UpdateLabOrderItemDto {
   @IsOptional()
-  @IsEnum(LabOrderItemStatus, {
-    message: 'status must be a valid lab item status',
+  @IsIn(SETTABLE, {
+    message: `status must be one of: ${SETTABLE.join(', ')} (verify has its own action)`,
   })
   status?: LabOrderItemStatus;
 

@@ -20,11 +20,9 @@ import { CreateLabOrderDto } from './dto/create-lab-order.dto';
 import { CreateLabTestDto } from './dto/create-lab-test.dto';
 import { QueryLabOrdersDto } from './dto/query-lab-orders.dto';
 import { QueryLabTestsDto } from './dto/query-lab-tests.dto';
-import { UpdateLabOrderItemDto } from './dto/update-lab-order-item.dto';
 import { UpdateLabOrderDto } from './dto/update-lab-order.dto';
 import { UpdateLabTestDto } from './dto/update-lab-test.dto';
 import { LabOrdersService } from './lab-orders.service';
-import { LabResultsService } from './lab-results.service';
 import { LabTestsService } from './lab-tests.service';
 import { PaginationQueryDTO } from 'common/pagination';
 
@@ -33,7 +31,6 @@ export class LabController {
   constructor(
     private readonly labTestsService: LabTestsService,
     private readonly labOrdersService: LabOrdersService,
-    private readonly labResultsService: LabResultsService,
   ) {}
 
   @Post('tests')
@@ -140,16 +137,5 @@ export class LabController {
     @Body('reason') reason?: string,
   ) {
     return this.labOrdersService.cancelOrder(id, reason);
-  }
-
-  @Patch('orders/:orderId/items/:itemId')
-  @Roles(UserRole.LAB_TECH, UserRole.ADMIN, UserRole.SUPER_ADMIN)
-  updateOrderItem(
-    @Param('orderId', ParseUUIDPipe) orderId: string,
-    @Param('itemId', ParseUUIDPipe) itemId: string,
-    @Body() dto: UpdateLabOrderItemDto,
-    @CurrentUser() user: AuthenticatedUser,
-  ) {
-    return this.labResultsService.updateItem(orderId, itemId, dto, user.id);
   }
 }

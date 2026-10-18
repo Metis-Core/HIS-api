@@ -8,6 +8,8 @@ import { LabOrderCancelledEvent } from 'src/lab/events/lab-order-cancelled.event
 import { LabOrderCompletedEvent } from 'src/lab/events/lab-order-completed.event';
 import { LabOrderCreatedEvent } from 'src/lab/events/lab-order-created.event';
 import { LabResultReadyEvent } from 'src/lab/events/lab-result-ready.event';
+import { LabResultVerifiedEvent } from 'src/lab/events/lab-result-verified.event';
+import { resultPriority, verifiedMessage } from './lab-result-messages';
 import { Patient } from 'src/patients/entities/patient.entity';
 import { Prescription } from 'src/pharmacy/entities/prescription.entity';
 import { PrescriptionStatus } from 'src/pharmacy/enums/prescription-status.enum';
@@ -131,7 +133,9 @@ export class WorkflowNotificationsListener {
     if (event.data.servedById) return;
     await this.safely('queue entry advanced', async () => {
       const { department, visitId, patientId } = event.data;
-      const patient = patientId ? await this.patientLabel(patientId) : await this.patientLabelForVisit(visitId);
+      const patient = patientId
+        ? await this.patientLabel(patientId)
+        : await this.patientLabelForVisit(visitId);
       await this.notifyDepartment(department, {
         type: NotificationType.QUEUE,
         priority: NotificationPriority.HIGH,
@@ -168,27 +172,52 @@ export class WorkflowNotificationsListener {
   async onLabOrderCancelled(event: LabOrderCancelledEvent) {
     await this.safely('lab order cancelled', async () => {
       const patient = await this.patientLabel(event.patientId);
-      await this.dispatcher.toRoles(DEPARTMENT_ROLES[Department.MAIN_LABORATORY], {
-        type: NotificationType.LAB_ORDER,
-        priority: NotificationPriority.NORMAL,
-        title: 'Lab order cancelled',
-        body: `The lab order for ${patient} was cancelled.`,
-        actionUrl: '/lab',
-        resourceType: 'lab_order',
-        resourceId: event.orderId,
-      });
+      await this.dispatcher.toRoles(
+        DEPARTMENT_ROLES[Department.MAIN_LABORATORY],
+        {
+          type: NotificationType.LAB_ORDER,
+          priority: NotificationPriority.NORMAL,
+          title: 'Lab order cancelled',
+          body: `The lab order for ${patient} was cancelled.`,
+          actionUrl: '/lab',
+          resourceType: 'lab_order',
+          resourceId: event.orderId,
+        },
+      );
     });
   }
 
+  // Entered results wait for a second look in the lab; the doctor is told only once they are verified (C3).
   @OnEvent(LabResultReadyEvent.name, { async: true })
   async onLabResultReady(event: LabResultReadyEvent) {
-    await this.safely('lab result ready', async () => {
+    await this.safely('lab result awaiting verification', async () => {
       const patient = await this.patientLabel(event.patientId);
+      await this.dispatcher.toRoles(
+        DEPARTMENT_ROLES[Department.MAIN_LABORATORY],
+        {
+          type: NotificationType.LAB_RESULT,
+          priority: NotificationPriority.NORMAL,
+          title: `Awaiting verification: ${event.testName}`,
+          body: `${patient}: the ${event.testName} result was entered and needs verifying.`,
+          actionUrl: '/lab',
+          resourceType: 'lab_order',
+          resourceId: event.orderId,
+        },
+        event.resultedById,
+      );
+    });
+  }
+
+  @OnEvent(LabResultVerifiedEvent.name, { async: true })
+  async onLabResultVerified(event: LabResultVerifiedEvent) {
+    await this.safely('lab result verified', async () => {
+      const patient = await this.patientLabel(event.patientId);
+      const { title, body } = verifiedMessage(event, patient);
       await this.dispatcher.toUsers([event.orderedById], {
         type: NotificationType.LAB_RESULT,
-        priority: event.isAbnormal ? NotificationPriority.CRITICAL : NotificationPriority.HIGH,
-        title: event.isAbnormal ? `Abnormal result: ${event.testName}` : `Result ready: ${event.testName}`,
-        body: `${patient}: ${event.testName} result is in${event.isAbnormal ? ' and flagged abnormal' : ''}. Other tests on this order are still pending.`,
+        priority: resultPriority(event.critical, event.flagged),
+        title,
+        body,
         actionUrl: `/patients/${event.patientId}`,
         resourceType: 'lab_order',
         resourceId: event.orderId,
@@ -200,12 +229,22 @@ export class WorkflowNotificationsListener {
   async onLabOrderCompleted(event: LabOrderCompletedEvent) {
     await this.safely('lab order completed', async () => {
       const patient = await this.patientLabel(event.patientId);
-      const abnormal = event.abnormalCount > 0;
+      const notes = [
+        event.criticalCount ? `${event.criticalCount} critical` : '',
+        event.abnormalCount
+          ? `${event.abnormalCount} outside the reference range`
+          : '',
+      ].filter(Boolean);
       await this.dispatcher.toUsers([event.orderedById], {
         type: NotificationType.LAB_RESULT,
-        priority: abnormal ? NotificationPriority.CRITICAL : NotificationPriority.HIGH,
-        title: abnormal ? 'Lab results ready — abnormal findings' : 'Lab results ready',
-        body: `All results for ${patient} are ready${abnormal ? `; ${event.abnormalCount} flagged abnormal` : ''}.`,
+        priority: resultPriority(
+          event.criticalCount > 0,
+          event.abnormalCount > 0,
+        ),
+        title: event.criticalCount
+          ? 'Lab results verified — critical values'
+          : 'Lab results verified',
+        body: `All results for ${patient} are verified${notes.length ? `; ${notes.join(', ')}` : ''}.`,
         actionUrl: `/patients/${event.patientId}`,
         resourceType: 'lab_order',
         resourceId: event.orderId,
@@ -245,7 +284,9 @@ export class WorkflowNotificationsListener {
       await this.dispatcher.toUsers([prescription.prescribedById], {
         type: NotificationType.PRESCRIPTION,
         priority: NotificationPriority.NORMAL,
-        title: complete ? 'Medication dispensed' : 'Medication partially dispensed',
+        title: complete
+          ? 'Medication dispensed'
+          : 'Medication partially dispensed',
         body: complete
           ? `The prescription for ${patient} has been fully dispensed.`
           : `Part of the prescription for ${patient} has been dispensed; the rest is pending.`,
@@ -273,7 +314,9 @@ export class WorkflowNotificationsListener {
       where: { id: patientId },
       select: { id: true, firstName: true, lastName: true },
     });
-    return patient ? `${patient.firstName} ${patient.lastName}`.trim() : 'A patient';
+    return patient
+      ? `${patient.firstName} ${patient.lastName}`.trim()
+      : 'A patient';
   }
 
   private async patientLabelForVisit(visitId: string): Promise<string> {

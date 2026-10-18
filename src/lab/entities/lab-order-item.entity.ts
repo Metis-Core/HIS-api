@@ -56,6 +56,24 @@ export class LabOrderItem extends BaseEntity {
   @Column({ type: 'timestamp', nullable: true })
   collectedAt: Date | null;
 
+  @ManyToOne(() => User, { nullable: true, onDelete: 'SET NULL' })
+  @JoinColumn({ name: 'collectedById' })
+  collectedBy: User | null;
+
+  @Column({ type: 'uuid', nullable: true })
+  collectedById: string | null;
+
+  @ManyToOne(() => User, { nullable: true, onDelete: 'SET NULL' })
+  @JoinColumn({ name: 'verifiedById' })
+  verifiedBy: User | null;
+
+  @Column({ type: 'uuid', nullable: true })
+  verifiedById: string | null;
+
+  // Once set the result is locked; corrections go through amendments.
+  @Column({ type: 'timestamptz', nullable: true })
+  verifiedAt: Date | null;
+
   @Column({ type: 'timestamp', nullable: true })
   resultedAt: Date | null;
 }

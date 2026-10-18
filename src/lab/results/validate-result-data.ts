@@ -64,7 +64,7 @@ export function validateResultData(
     schema.fields
       .filter((f) => f.required && isEmpty(clean[f.key]))
       .forEach((f) => problems.push(`${f.label} is required`));
-    if (Object.keys(clean).length === 0)
+    if (Object.keys(clean).length === 0 && !problems.length)
       problems.push('Enter at least one result value');
   }
   if (problems.length) throw new BadRequestException(problems);

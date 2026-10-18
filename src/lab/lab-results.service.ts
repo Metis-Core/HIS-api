@@ -1,93 +1,97 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { DataSource, EntityManager } from 'typeorm';
-import { Department } from 'common/enums/department.enum';
-import { AfterCommit, commitThenEmit } from 'common/events/after-commit';
-import { QueueEntriesService } from 'src/queue/queue-entries.service';
+import { commitThenEmit } from 'common/events/after-commit';
+import { AmendLabResultDTO } from './dto/amend-lab-result.dto';
 import { UpdateLabOrderItemDto } from './dto/update-lab-order-item.dto';
 import { LabOrderItem } from './entities/lab-order-item.entity';
 import { LabOrder } from './entities/lab-order.entity';
-import { LabOrderItemStatus } from './enums/lab-order-item-status.enum';
-import { LabOrderStatus } from './enums/lab-order-status.enum';
-import { LabOrderCompletedEvent } from './events/lab-order-completed.event';
+import { LabResultAmendment } from './entities/lab-result-amendment.entity';
+import { LabOrderItemStatus as S } from './enums/lab-order-item-status.enum';
 import { LabResultReadyEvent } from './events/lab-result-ready.event';
+import { LabResultVerifiedEvent } from './events/lab-result-verified.event';
+import {
+  hasCriticalValue,
+  LabOrderProgressService,
+} from './lab-order-progress.service';
 import { LabOrdersService } from './lab-orders.service';
 import { applyResultData } from './results/apply-result';
+import { assertEditable, assertTransition } from './results/item-transitions';
 import { patientContext } from './results/patient-context';
 
-const IN_PROGRESS = [
-  LabOrderItemStatus.COLLECTED,
-  LabOrderItemStatus.IN_PROCESS,
-];
-const TERMINAL = [
-  LabOrderItemStatus.RESULT_READY,
-  LabOrderItemStatus.CANCELLED,
-];
+const verifiedEvent = (item: LabOrderItem, amended = false) =>
+  new LabResultVerifiedEvent(
+    item.orderId,
+    item.id,
+    item.order.patientId,
+    item.order.orderedById,
+    item.test?.name ?? 'Lab test',
+    item.isAbnormal,
+    hasCriticalValue(item),
+    amended,
+  );
 
-/** Result entry on lab order items and the order status that follows from it. */
+/** Result entry, verification and amendment of single tests on a lab order (L5, H-10). */
 @Injectable()
 export class LabResultsService {
   constructor(
     private readonly dataSource: DataSource,
     private readonly labOrders: LabOrdersService,
+    private readonly progress: LabOrderProgressService,
     private readonly eventEmitter: EventEmitter2,
-    private readonly queueEntries: QueueEntriesService,
   ) {}
 
   async updateItem(
     orderId: string,
     itemId: string,
     dto: UpdateLabOrderItemDto,
-    resultedById: string,
+    actorId: string,
   ): Promise<LabOrder> {
     await commitThenEmit(
       this.dataSource,
       this.eventEmitter,
       async (manager, after) => {
-        const item = await manager.findOne(LabOrderItem, {
-          where: { id: itemId, orderId },
-          relations: { test: true, order: { patient: true } },
-        });
-        if (!item) throw new NotFoundException('Lab order item not found');
-
-        const target = dto.status ?? item.status;
-        const ready = target === LabOrderItemStatus.RESULT_READY;
+        const item = await this.loadItem(manager, orderId, itemId);
+        const from = item.status;
+        const target = dto.status ?? from;
+        assertTransition(from, target);
+        const ready = target === S.RESULT_READY;
         if (dto.resultData !== undefined || ready) {
+          const data = dto.resultData ?? item.resultData ?? {};
           applyResultData(
             item,
             item.test,
-            dto.resultData ?? item.resultData ?? {},
+            data,
             patientContext(item.order.patient, new Date()),
             ready,
           );
         }
-        if (dto.status !== undefined) item.status = dto.status;
         if (dto.resultNotes !== undefined)
-          item.resultNotes = dto.resultNotes?.trim() || null;
-        if (dto.status === LabOrderItemStatus.COLLECTED && !item.collectedAt) {
+          item.resultNotes = dto.resultNotes.trim() || null;
+        if ((target === S.COLLECTED || ready) && !item.collectedAt) {
           item.collectedAt = new Date();
+          item.collectedById = actorId;
         }
-        if (dto.status === LabOrderItemStatus.RESULT_READY) {
+        if (ready) {
           item.resultedAt = new Date();
-          item.resultedById = resultedById;
+          item.resultedById = actorId;
         }
-        await manager.save(item);
-
-        const order = await this.reconcileOrderStatus(manager, after, orderId);
-        // A fully completed order is announced by LabOrderCompletedEvent instead.
-        if (
-          dto.status === LabOrderItemStatus.RESULT_READY &&
-          order.status !== LabOrderStatus.COMPLETED
-        ) {
+        item.status = target;
+        await manager.save(LabOrderItem, item);
+        await this.progress.reconcile(manager, after, orderId);
+        if (ready && from !== S.RESULT_READY) {
           after.emit(
             LabResultReadyEvent.name,
             new LabResultReadyEvent(
-              order.id,
+              orderId,
               item.id,
-              order.patientId,
-              order.orderedById,
+              item.order.patientId,
+              actorId,
               item.test?.name ?? 'Lab test',
-              item.isAbnormal,
             ),
           );
         }
@@ -96,50 +100,102 @@ export class LabResultsService {
     return this.labOrders.findOne(orderId);
   }
 
-  private async reconcileOrderStatus(
-    manager: EntityManager,
-    after: AfterCommit,
+  async verify(
     orderId: string,
+    itemId: string,
+    actorId: string,
   ): Promise<LabOrder> {
-    const order = await manager.findOneOrFail(LabOrder, {
-      where: { id: orderId },
-    });
-    if (order.status === LabOrderStatus.CANCELLED) return order;
-    const items = await manager.find(LabOrderItem, { where: { orderId } });
-
-    const allTerminal = items.every((i) => TERMINAL.includes(i.status));
-    const anyReady = items.some(
-      (i) => i.status === LabOrderItemStatus.RESULT_READY,
-    );
-    if (allTerminal && anyReady) {
-      order.status = LabOrderStatus.COMPLETED;
-      order.completedAt = order.completedAt ?? new Date();
-      await manager.save(order);
-      const visitId = order.visitId;
-      if (visitId) {
-        after.run(() =>
-          this.queueEntries.completeCurrentFor(
-            visitId,
-            Department.MAIN_LABORATORY,
-          ),
+    await commitThenEmit(
+      this.dataSource,
+      this.eventEmitter,
+      async (manager, after) => {
+        const item = await this.loadItem(manager, orderId, itemId);
+        if (item.status !== S.RESULT_READY || !item.resultData) {
+          throw new ConflictException(
+            'Only an entered result that is ready can be verified',
+          );
+        }
+        item.status = S.VERIFIED;
+        item.verifiedById = actorId;
+        item.verifiedAt = new Date();
+        await manager.save(LabOrderItem, item);
+        const completed = await this.progress.reconcile(
+          manager,
+          after,
+          orderId,
         );
-      }
-      after.emit(
-        LabOrderCompletedEvent.name,
-        new LabOrderCompletedEvent(
-          order.id,
-          order.patientId,
-          order.orderedById,
-          items.filter((i) => i.isAbnormal).length,
-        ),
-      );
-    } else if (
-      items.some((i) => IN_PROGRESS.includes(i.status)) &&
-      order.status === LabOrderStatus.PENDING
-    ) {
-      order.status = LabOrderStatus.IN_PROGRESS;
-      await manager.save(order);
-    }
-    return order;
+        // The order-completed alert already covers the last test of an order.
+        if (!completed)
+          after.emit(LabResultVerifiedEvent.name, verifiedEvent(item));
+      },
+    );
+    return this.labOrders.findOne(orderId);
+  }
+
+  async amend(
+    orderId: string,
+    itemId: string,
+    dto: AmendLabResultDTO,
+    actorId: string,
+  ): Promise<LabOrder> {
+    await commitThenEmit(
+      this.dataSource,
+      this.eventEmitter,
+      async (manager, after) => {
+        const item = await this.loadItem(manager, orderId, itemId);
+        if (item.status !== S.VERIFIED) {
+          assertEditable(item.status);
+          throw new ConflictException(
+            'This result is not verified yet; edit it directly',
+          );
+        }
+        const before = manager.create(LabResultAmendment, {
+          itemId: item.id,
+          previousData: item.resultData,
+          previousFlags: item.resultFlags,
+          previousNotes: item.resultNotes,
+          previousVerifiedAt: item.verifiedAt,
+          reason: dto.reason.trim(),
+          amendedById: actorId,
+        });
+        applyResultData(
+          item,
+          item.test,
+          dto.resultData,
+          patientContext(item.order.patient, new Date()),
+          true,
+        );
+        if (dto.resultNotes !== undefined)
+          item.resultNotes = dto.resultNotes.trim() || null;
+        item.verifiedById = actorId;
+        item.verifiedAt = new Date();
+        await manager.save(LabResultAmendment, {
+          ...before,
+          newData: item.resultData,
+          newNotes: item.resultNotes,
+        });
+        await manager.save(LabOrderItem, item);
+        after.emit(LabResultVerifiedEvent.name, verifiedEvent(item, true));
+      },
+    );
+    return this.labOrders.findOne(orderId);
+  }
+
+  // The row lock stops two people verifying or amending the same result at once.
+  private async loadItem(
+    manager: EntityManager,
+    orderId: string,
+    itemId: string,
+  ): Promise<LabOrderItem> {
+    await manager.findOne(LabOrderItem, {
+      where: { id: itemId, orderId },
+      lock: { mode: 'pessimistic_write' },
+    });
+    const item = await manager.findOne(LabOrderItem, {
+      where: { id: itemId, orderId },
+      relations: { test: true, order: { patient: true } },
+    });
+    if (!item) throw new NotFoundException('Lab order item not found');
+    return item;
   }
 }

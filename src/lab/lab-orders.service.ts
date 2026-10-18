@@ -121,7 +121,12 @@ export class LabOrdersService extends BaseCrudService<LabOrder> {
     const order = await this.labOrdersRepository.findOne({
       where: { id },
       relations: {
-        items: { test: true },
+        items: {
+          test: true,
+          resultedBy: true,
+          verifiedBy: true,
+          collectedBy: true,
+        },
         patient: true,
         orderedBy: true,
         consultation: true,
@@ -203,13 +208,9 @@ export class LabOrdersService extends BaseCrudService<LabOrder> {
     if (order.status === LabOrderStatus.CANCELLED) {
       throw new BadRequestException('Cancelled orders cannot be updated');
     }
-    if (dto.status !== undefined) order.status = dto.status;
     if (dto.priority !== undefined) order.priority = dto.priority;
     if (dto.clinicalNotes !== undefined) {
       order.clinicalNotes = dto.clinicalNotes?.trim() || null;
-    }
-    if (order.status === LabOrderStatus.COMPLETED && !order.completedAt) {
-      order.completedAt = new Date();
     }
     await this.labOrdersRepository.save(order);
     return this.findOne(id);
