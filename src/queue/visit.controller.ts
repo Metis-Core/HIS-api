@@ -18,6 +18,7 @@ import { RoleGroups } from 'common/access/role-groups';
 import { Roles } from 'common/decorators/roles.decorator';
 import type { AuthenticatedUser } from 'common/interfaces/authenticated-user.interface';
 import { Department } from 'common/enums/department.enum';
+import { UserRole } from 'common/enums/userRoles.enum';
 import { QueueEntriesService } from './queue-entries.service';
 import { VisitsService } from './visit.service';
 import { formatResponse } from '../../common/response-format';
@@ -45,7 +46,7 @@ export class VisitController {
   @Roles(RoleGroups.FLOOR_STAFF)
   async getQueues() {
     const visits = await this.visitService.findManyWithPagination({
-      relations: { queueEntries: true, patient: true },
+      relations: { queueEntries: true, patient: true, assignedDoctor: true },
       order: { createdAt: 'DESC', queueEntries: { sequenceNumber: 'ASC' } },
       take: 100,
     });
@@ -56,8 +57,16 @@ export class VisitController {
   @Roles(RoleGroups.FLOOR_STAFF)
   async getDepartmentQueue(
     @Param('department', new ParseEnumPipe(Department)) department: Department,
+    @CurrentUser() user: AuthenticatedUser,
   ) {
-    const entries = await this.queueEntries.findByDepartment(department);
+    const ownDoctorQueue =
+      user.role === UserRole.DOCTOR &&
+      department === Department.OUTPATIENT_CLINIC;
+    const entries = await this.queueEntries.findByDepartment(
+      department,
+      undefined,
+      ownDoctorQueue ? user.id : undefined,
+    );
     return formatResponse(entries);
   }
 
@@ -176,6 +185,7 @@ export class VisitController {
         patient: true,
         queueEntries: { servedBy: true },
         checkedInBy: true,
+        assignedDoctor: true,
       },
     });
     return formatResponse(visit);

@@ -1,6 +1,7 @@
 import { Admission } from 'src/admissions/entities/admission.entity';
 import { AuditLog } from 'src/auditLogs/entities/audit-log.entity';
 import { AuthToken } from 'src/auth/entities/auth-token.entity';
+import { AvailabilityPeriod } from 'src/availability/entities/availability-period.entity';
 import { ConsultationAddendum } from 'src/consultation/entities/consultation-addendum.entity';
 import { ConsultationDiagnosis } from 'src/consultation/entities/consultation-diagnosis.entity';
 import { Consultation } from 'src/consultation/entities/consultation.entity';
@@ -16,6 +17,10 @@ import { LabAttachment } from 'src/lab/attachments/lab-attachment.entity';
 import { LabResultAmendment } from 'src/lab/entities/lab-result-amendment.entity';
 import { LabTest } from 'src/lab/entities/lab-test.entity';
 import { Notification } from 'src/notifications/entities/notification.entity';
+import { ProcedureOrder } from 'src/orders/entities/procedure-order.entity';
+import { DayClosing } from 'src/payments/entities/day-closing.entity';
+import { Invoice } from 'src/payments/entities/invoice.entity';
+import { Payment } from 'src/payments/entities/payment.entity';
 import { OneTimePassword } from 'src/otp/entities/otp.entity';
 import { Patient } from 'src/patients/entities/patient.entity';
 import { VisitCharge } from 'src/payments/entities/visit-charge.entity';
@@ -31,6 +36,7 @@ import { User } from 'src/users/entities/user.entity';
 
 export const entities = [
   User,
+  AvailabilityPeriod,
   AuthToken,
   Patient,
   Contact,
@@ -45,6 +51,10 @@ export const entities = [
   OneTimePassword,
   Service,
   Notification,
+  ProcedureOrder,
+  Invoice,
+  Payment,
+  DayClosing,
   LabTest,
   LabOrder,
   LabOrderItem,

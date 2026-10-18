@@ -181,7 +181,7 @@ export class VisitsService extends BaseCrudService<Visit> {
           ...(status ? { status } : {}),
           ...(visitType ? { visitType } : {}),
         },
-        relations: { patient: true, queueEntries: true },
+        relations: { patient: true, queueEntries: true, assignedDoctor: true },
         order: { createdAt: sortOrder, id: sortOrder },
       },
       query,

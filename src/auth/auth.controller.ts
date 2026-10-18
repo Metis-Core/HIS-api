@@ -14,6 +14,7 @@ import { CurrentUser } from 'common/decorators/current-user.decorator';
 import { Public } from 'common/decorators/public.decorator';
 import type { AuthenticatedUser } from 'common/interfaces/authenticated-user.interface';
 import type { JwtPayload } from 'common/interfaces/jwt-payload.interface';
+import { passwordPolicy } from 'common/security/password-policy';
 import { JwtRefreshGuard } from 'core/guards/jwt-refresh.guard';
 import { AuthService } from './auth.service';
 import { ChangePasswordDTO } from './dto/change-password.dto';
@@ -24,6 +25,12 @@ import { UpdateProfileDTO } from './dto/update-profile.dto';
 @Controller('auth')
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
+
+  @Public()
+  @Get('password-policy')
+  policy() {
+    return passwordPolicy();
+  }
 
   @Public()
   @HttpCode(HttpStatus.OK)

@@ -3,6 +3,7 @@ import { getRepositoryToken } from '@nestjs/typeorm';
 import { ServicesService } from 'src/services/services.service';
 import { VisitCharge } from './entities/visit-charge.entity';
 import { ChargeSource, ChargeStatus } from './enums/charge.enum';
+import { InvoicesService } from './invoices.service';
 import { PaymentsService } from './payments.service';
 
 describe('PaymentsService', () => {
@@ -14,6 +15,7 @@ describe('PaymentsService', () => {
     findOne: jest.fn(),
     delete: jest.fn(),
   };
+  const invoices = { syncForVisit: jest.fn() };
   const servicesService = {
     findOne: jest.fn(),
     findConsultationService: jest.fn(),
@@ -26,6 +28,7 @@ describe('PaymentsService', () => {
         PaymentsService,
         { provide: getRepositoryToken(VisitCharge), useValue: repository },
         { provide: ServicesService, useValue: servicesService },
+        { provide: InvoicesService, useValue: invoices },
       ],
     }).compile();
 
@@ -33,14 +36,32 @@ describe('PaymentsService', () => {
   });
 
   it('prices a catalog service from its fee times quantity', async () => {
-    servicesService.findOne.mockResolvedValue({ id: 's1', name: 'Dressing', fee: 5000 });
-    const charge = await service.addCharge({ visitId: 'v1', serviceId: 's1', quantity: 2 }, 'u1');
-    expect(charge).toMatchObject({ source: ChargeSource.SERVICE, unitPrice: 5000, amount: 10000 });
+    servicesService.findOne.mockResolvedValue({
+      id: 's1',
+      name: 'Dressing',
+      fee: 5000,
+    });
+    const charge = await service.addCharge(
+      { visitId: 'v1', serviceId: 's1', quantity: 2 },
+      'u1',
+    );
+    expect(charge).toMatchObject({
+      source: ChargeSource.SERVICE,
+      unitPrice: 5000,
+      amount: 10000,
+    });
   });
 
   it('records an ad-hoc charge from description and unit price', async () => {
-    const charge = await service.addCharge({ visitId: 'v1', description: ' Splint ', unitPrice: 7000 }, 'u1');
-    expect(charge).toMatchObject({ source: ChargeSource.OTHER, description: 'Splint', amount: 7000 });
+    const charge = await service.addCharge(
+      { visitId: 'v1', description: ' Splint ', unitPrice: 7000 },
+      'u1',
+    );
+    expect(charge).toMatchObject({
+      source: ChargeSource.OTHER,
+      description: 'Splint',
+      amount: 7000,
+    });
   });
 
   it('bills each lab test at its own price', async () => {
@@ -55,6 +76,40 @@ describe('PaymentsService', () => {
     expect(rows.map((r) => r.amount)).toEqual([20000, 8000]);
   });
 
+  it('bills a radiology order at its service fee and refreshes the invoice', async () => {
+    servicesService.findOne.mockResolvedValue({ id: 's9', fee: 60000 });
+
+    const charge = await service.addProcedureCharge(
+      'v1',
+      ChargeSource.RADIOLOGY,
+      { id: 'o1', name: 'Chest X-ray', serviceId: 's9' },
+      'u1',
+    );
+
+    expect(charge).toMatchObject({
+      source: ChargeSource.RADIOLOGY,
+      referenceId: 'o1',
+      amount: 60000,
+    });
+    expect(invoices.syncForVisit).toHaveBeenCalledWith('v1');
+  });
+
+  it('removes the pending charge of a cancelled order but keeps paid ones', async () => {
+    repository.find.mockResolvedValue([
+      { id: 'c1', visitId: 'v1', status: ChargeStatus.PENDING },
+    ]);
+    const remove = jest.fn();
+    Object.assign(repository, { remove });
+
+    await service.dropPendingChargesFor('o1');
+
+    expect(repository.find).toHaveBeenCalledWith({
+      where: { referenceId: 'o1', status: ChargeStatus.PENDING },
+    });
+    expect(remove).toHaveBeenCalled();
+    expect(invoices.syncForVisit).toHaveBeenCalledWith('v1');
+  });
+
   it('skips the consultation fee when no consultation service is priced', async () => {
     servicesService.findConsultationService.mockResolvedValue(null);
     await expect(service.addConsultationFee('v1', 'u1')).resolves.toBeNull();
@@ -67,6 +122,9 @@ describe('PaymentsService', () => {
       { amount: 5000, status: ChargeStatus.PENDING },
       { amount: 3000, status: ChargeStatus.WAIVED },
     ]);
-    await expect(service.billForVisit('v1')).resolves.toMatchObject({ total: 15000, outstanding: 5000 });
+    await expect(service.billForVisit('v1')).resolves.toMatchObject({
+      total: 15000,
+      outstanding: 5000,
+    });
   });
 });

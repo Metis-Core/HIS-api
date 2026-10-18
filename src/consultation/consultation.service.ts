@@ -3,9 +3,11 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Department } from 'common/enums/department.enum';
 import { BaseCrudService } from 'common/services/crud.service';
+import { DoctorAssignmentService } from 'src/doctors/doctor-assignment.service';
 import {
   ConsultationActor,
   assertCanEditConsultation,
+  isConsultationAdmin,
 } from './consultation-access.policy';
 import { ConsultationDiagnosesService } from './consultation-diagnoses.service';
 import {
@@ -28,6 +30,7 @@ export class ConsultationService extends BaseCrudService<Consultation> {
     private readonly consultationsRepository: Repository<Consultation>,
     private readonly references: ConsultationReferencesService,
     private readonly diagnoses: ConsultationDiagnosesService,
+    private readonly assignment: DoctorAssignmentService,
   ) {
     super(consultationsRepository);
   }
@@ -41,6 +44,11 @@ export class ConsultationService extends BaseCrudService<Consultation> {
     await this.references.assertAssignableDoctor(doctorId, actor);
     if (dto.visitId) {
       await this.references.assertVisitOfPatient(dto.visitId, dto.patientId);
+      await this.assignment.claim(
+        dto.visitId,
+        doctorId,
+        isConsultationAdmin(actor.role),
+      );
     }
     const consultation = this.consultationsRepository.create({
       ...encounterChanges(dto),

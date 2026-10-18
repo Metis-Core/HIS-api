@@ -1,4 +1,5 @@
 import 'reflect-metadata';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { plainToInstance } from 'class-transformer';
 import { validateOrReject } from 'class-validator';
 import { DataSource } from 'typeorm';
@@ -20,7 +21,11 @@ export async function withUsersService<T>(
   ).initialize();
   try {
     return await work(
-      new UsersService(dataSource.getRepository(User), new PasswordService()),
+      new UsersService(
+        dataSource.getRepository(User),
+        new PasswordService(),
+        new EventEmitter2(),
+      ),
     );
   } finally {
     await dataSource.destroy();

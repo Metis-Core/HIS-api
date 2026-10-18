@@ -1,8 +1,14 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
 import { LabOrderCreatedEvent } from 'src/lab/events/lab-order-created.event';
+import { OrderKind } from 'src/orders/enums/order-kind.enum';
+import {
+  ProcedureCancelledEvent,
+  ProcedureOrderedEvent,
+} from 'src/orders/events/procedure-order.events';
 import { VisitCheckedInEvent } from 'src/queue/events/visit-checked-in.event';
 import { VisitIntenentsEnum } from 'src/queue/enums/visit-type.enum';
+import { ChargeSource } from '../enums/charge.enum';
 import { PaymentsService } from '../payments.service';
 
 @Injectable()
@@ -27,6 +33,38 @@ export class BillingListener {
     } catch (error) {
       this.logger.error(
         `Failed to bill consultation for visit ${event.visitId}`,
+        error as Error,
+      );
+    }
+  }
+
+  @OnEvent(ProcedureOrderedEvent.channel, { async: true })
+  async onProcedureOrdered(event: ProcedureOrderedEvent) {
+    if (!event.visitId || !event.serviceId) return;
+    try {
+      await this.payments.addProcedureCharge(
+        event.visitId,
+        event.kind === OrderKind.RADIOLOGY
+          ? ChargeSource.RADIOLOGY
+          : ChargeSource.SURGERY,
+        { id: event.orderId, name: event.name, serviceId: event.serviceId },
+        event.orderedById,
+      );
+    } catch (error) {
+      this.logger.error(
+        `Failed to bill order ${event.orderId}`,
+        error as Error,
+      );
+    }
+  }
+
+  @OnEvent(ProcedureCancelledEvent.channel, { async: true })
+  async onProcedureCancelled(event: ProcedureCancelledEvent) {
+    try {
+      await this.payments.dropPendingChargesFor(event.orderId);
+    } catch (error) {
+      this.logger.error(
+        `Failed to unbill order ${event.orderId}`,
         error as Error,
       );
     }

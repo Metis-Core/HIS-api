@@ -1,6 +1,10 @@
 import { Admission } from 'src/admissions/entities/admission.entity';
 import { LabAttachment } from 'src/lab/attachments/lab-attachment.entity';
+import { ProcedureOrder } from 'src/orders/entities/procedure-order.entity';
 import { Patient } from 'src/patients/entities/patient.entity';
+import { DayClosing } from 'src/payments/entities/day-closing.entity';
+import { Payment } from 'src/payments/entities/payment.entity';
+import { VisitCharge } from 'src/payments/entities/visit-charge.entity';
 import { Visit } from 'src/queue/entities/visit.entity';
 import { Service } from 'src/services/entities/service.entity';
 import { User } from 'src/users/entities/user.entity';
@@ -13,4 +17,8 @@ export const AUDITED_ENTITIES = new Map<unknown, string>([
   [Service, 'service'],
   [Admission, 'admission'],
   [LabAttachment, 'lab_attachment'],
+  [ProcedureOrder, 'procedure_order'],
+  [Payment, 'payment'],
+  [DayClosing, 'day_closing'],
+  [VisitCharge, 'charge'],
 ]);

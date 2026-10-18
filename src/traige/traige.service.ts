@@ -7,6 +7,7 @@ import { PatientsService } from 'src/patients/patients.service';
 import { QueueEntriesService } from 'src/queue/queue-entries.service';
 import { VisitsService } from 'src/queue/visit.service';
 import { categoryForAcuity } from 'src/queue/journey/visit-priority';
+import { DoctorAssignmentService } from 'src/doctors/doctor-assignment.service';
 import { UsersService } from 'src/users/users.service';
 import { Department } from 'common/enums/department.enum';
 import { VisitIntenentsEnum } from 'src/queue/enums/visit-type.enum';
@@ -27,6 +28,7 @@ export class TraigeService extends BaseCrudService<Triage> {
     private readonly usersService: UsersService,
     private readonly queueEntries: QueueEntriesService,
     private readonly visits: VisitsService,
+    private readonly assignment: DoctorAssignmentService,
   ) {
     super(triageRepository);
   }
@@ -43,18 +45,15 @@ export class TraigeService extends BaseCrudService<Triage> {
     }
     await this.usersService.findOne(triagedById);
 
-    let queueNumber = dto.queueNumber?.trim() ?? null;
-    if (dto.visitId) {
-      // const visit = await this.queueService.findVisit(dto.visitId);
-      // queueNumber = visit.tokenNumber;
-    }
+    const queueNumber = dto.queueNumber?.trim() ?? null;
+    const visitId = await this.resolveVisitId(dto.visitId, dto.patientId);
 
     const now = new Date();
     const triage = this.triageRepository.create({
       patientId: dto.patientId,
       triagedById,
       acuity: dto.acuity,
-      status: dto.status ?? TriageStatus.WAITING,
+      status: dto.status ?? TriageStatus.COMPLETED,
       chiefComplaint: dto.chiefComplaint.trim(),
       assessmentNotes: dto.assessmentNotes?.trim() ?? null,
       consciousness: dto.consciousness ?? ConsciousnessLevel.UNKNOWN,
@@ -81,16 +80,16 @@ export class TraigeService extends BaseCrudService<Triage> {
     const saved = await this.triageRepository.save(triage);
     const triageRecord = await this.findOne(saved.id);
 
-    if (dto.visitId) {
+    if (visitId) {
       await this.visits.raiseCategory(
-        dto.visitId,
+        visitId,
         categoryForAcuity(triageRecord.acuity),
       );
       if (
         triageRecord.status === TriageStatus.COMPLETED ||
         triageRecord.status === TriageStatus.REFERRED
       ) {
-        await this.syncVisitQueue(dto.visitId, triageRecord);
+        await this.syncVisitQueue(visitId);
       }
     }
 
@@ -292,17 +291,18 @@ export class TraigeService extends BaseCrudService<Triage> {
 
     await this.triageRepository.save(triage);
     const updated = await this.findOne(id);
+    const visitId = await this.resolveVisitId(dto.visitId, updated.patientId);
 
-    if (dto.visitId) {
+    if (visitId) {
       await this.visits.raiseCategory(
-        dto.visitId,
+        visitId,
         categoryForAcuity(updated.acuity),
       );
       if (
         updated.status === TriageStatus.COMPLETED ||
         updated.status === TriageStatus.REFERRED
       ) {
-        await this.syncVisitQueue(dto.visitId, updated);
+        await this.syncVisitQueue(visitId);
       }
     }
 
@@ -316,12 +316,24 @@ export class TraigeService extends BaseCrudService<Triage> {
     return this.triageRepository.save(triage);
   }
 
-  // Triage can only recommend the doctor's consultation; further routing is the doctor's (R6).
-  private async syncVisitQueue(visitId: string, triage: Triage): Promise<void> {
+  private async resolveVisitId(
+    visitId: string | undefined,
+    patientId: string,
+  ): Promise<string | undefined> {
+    if (visitId) return visitId;
+    const waiting = await this.queueEntries.findOpenEntryForPatient(
+      patientId,
+      Department.TRIAGE,
+    );
+    return waiting?.visitId;
+  }
+
+  private async syncVisitQueue(visitId: string): Promise<void> {
     await this.queueEntries.completeCurrentFor(visitId, Department.TRIAGE);
     await this.queueEntries.ensureIntent(
       visitId,
       VisitIntenentsEnum.CONSULTATION,
     );
+    await this.assignment.assignIfNeeded(visitId);
   }
 }

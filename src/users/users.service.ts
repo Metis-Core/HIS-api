@@ -5,6 +5,7 @@ import {
   Injectable,
   UnauthorizedException,
 } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { InjectRepository } from '@nestjs/typeorm';
 import { FindOptionsWhere, ILike, Repository } from 'typeorm';
 import { IPagination } from 'common/response-format';
@@ -16,6 +17,7 @@ import { CreateUserDto } from './dto/create-user.dto';
 import { QueryUsersDto } from './dto/query-users.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import type { AuthenticatedUser } from 'common/interfaces/authenticated-user.interface';
+import { UserAccountChangedEvent } from './events/user-account-changed.event';
 import { User } from './entities/user.entity';
 import { assertCanDelete, assertCanManage } from './user-access.policy';
 import { BaseCrudService } from '../../common/services/crud.service';
@@ -26,6 +28,7 @@ export class UsersService extends BaseCrudService<User> {
     @InjectRepository(User)
     private readonly usersRepository: Repository<User>,
     private readonly passwordService: PasswordService,
+    private readonly events: EventEmitter2,
   ) {
     super(usersRepository);
   }
@@ -85,6 +88,7 @@ export class UsersService extends BaseCrudService<User> {
   ): Promise<User> {
     const user = await this.findOne(id);
     assertCanManage(actor, user, updateUserDto);
+    const { role: previousRole, status: previousStatus } = user;
 
     if (updateUserDto.password) {
       user.passwordHash = await this.passwordService.hash(
@@ -111,6 +115,9 @@ export class UsersService extends BaseCrudService<User> {
     }
 
     await this.usersRepository.save(user);
+    if (user.role !== previousRole || user.status !== previousStatus) {
+      this.announceAccountChange(id);
+    }
     return this.findOne(id);
   }
 
@@ -118,6 +125,14 @@ export class UsersService extends BaseCrudService<User> {
     const user = await this.findOne(id);
     assertCanDelete(actor, user);
     await this.remove(id);
+    this.announceAccountChange(id);
+  }
+
+  private announceAccountChange(userId: string): void {
+    this.events.emit(
+      UserAccountChangedEvent.channel,
+      new UserAccountChangedEvent(userId),
+    );
   }
 
   async changeOwnPassword(

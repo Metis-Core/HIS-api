@@ -290,7 +290,20 @@ export class PharmacyService extends BaseCrudService<Prescription> {
         );
         const visitId: string | undefined = consultation?.[0]?.visitId;
         if (visitId) {
-          await this.queueEntries.completeCurrentFor(visitId, Department.MAIN_PHARMACY);
+          const [{ open }] = await manager.query(
+            `SELECT COUNT(*)::int AS open FROM prescriptions p
+             JOIN consultations c ON c.id = p."consultationId"
+             WHERE c."visitId" = $1 AND p.id <> $2 AND p.status IN ($3, $4)`,
+            [
+              visitId,
+              prescriptionId,
+              PrescriptionStatus.PENDING,
+              PrescriptionStatus.PARTIALLY_DISPENSED,
+            ],
+          );
+          if (open === 0) {
+            await this.queueEntries.completeCurrentFor(visitId, Department.MAIN_PHARMACY);
+          }
         }
       }
 

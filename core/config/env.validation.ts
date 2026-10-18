@@ -32,6 +32,12 @@ export class EnvironmentVariablesDTO {
   @IsString()
   CORS_ORIGINS?: string;
 
+  @IsOptional()
+  @IsInt({ message: 'PASSWORD_MIN_LENGTH must be an integer' })
+  @Min(8)
+  @Max(32)
+  PASSWORD_MIN_LENGTH?: number;
+
   @IsNotEmpty({ message: 'DB_HOST is required' })
   @IsString()
   DB_HOST: string;
