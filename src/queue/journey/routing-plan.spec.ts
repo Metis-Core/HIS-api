@@ -68,4 +68,30 @@ describe('planDoctorRouting', () => {
       { intent: Intent.BILLING },
     ]);
   });
+
+  it('sends an admitted patient to the ward before anything else', () => {
+    // Arrange
+    const requested = [Intent.LAB, Intent.ADMISSION];
+
+    // Act
+    const plan = planDoctorRouting(requested, []);
+
+    // Assert
+    expect(plan).toEqual([
+      { intent: Intent.ADMISSION },
+      { intent: Intent.LAB },
+      { intent: Intent.CONSULTATION, review: true },
+    ]);
+  });
+
+  it('does not queue the ward twice when the patient is already there', () => {
+    // Arrange
+    const requested = [Intent.ADMISSION];
+
+    // Act
+    const plan = planDoctorRouting(requested, [Department.INPATIENT_WARD]);
+
+    // Assert
+    expect(plan).toEqual([{ intent: Intent.BILLING }]);
+  });
 });

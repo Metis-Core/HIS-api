@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { AdmissionsModule } from 'src/admissions/admissions.module';
 import { DiagnosesModule } from 'src/diagnoses/diagnoses.module';
 import { LabModule } from 'src/lab/lab.module';
 import { PatientsModule } from 'src/patients/patients.module';
@@ -27,6 +28,7 @@ import { Consultation } from './entities/consultation.entity';
       ConsultationAddendum,
       ConsultationDiagnosis,
     ]),
+    AdmissionsModule,
     DiagnosesModule,
     PatientsModule,
     UsersModule,

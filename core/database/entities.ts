@@ -1,3 +1,4 @@
+import { Admission } from 'src/admissions/entities/admission.entity';
 import { AuditLog } from 'src/auditLogs/entities/audit-log.entity';
 import { AuthToken } from 'src/auth/entities/auth-token.entity';
 import { ConsultationAddendum } from 'src/consultation/entities/consultation-addendum.entity';
@@ -38,6 +39,7 @@ export const entities = [
   ConsultationAddendum,
   ConsultationDiagnosis,
   DiagnosisCode,
+  Admission,
   OneTimePassword,
   Service,
   Notification,

@@ -1,6 +1,12 @@
-import { ConflictException, Injectable } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { AdmissionsService } from 'src/admissions/admissions.service';
+import { VisitIntenentsEnum } from 'src/queue/enums/visit-type.enum';
 import { QueueEntry } from 'src/queue/entities/queue-entry.entity';
 import { QueueEntriesService } from 'src/queue/queue-entries.service';
 import { assertCanRouteClinically } from 'src/queue/journey/assert-can-route';
@@ -26,6 +32,7 @@ export class ConsultationLifecycleService {
     private readonly consultationsRepository: Repository<Consultation>,
     private readonly consultations: ConsultationService,
     private readonly queueEntries: QueueEntriesService,
+    private readonly admissions: AdmissionsService,
   ) {}
 
   async complete(
@@ -33,13 +40,32 @@ export class ConsultationLifecycleService {
     dto: CompleteConsultationDto,
     actor: ConsultationActor,
   ): Promise<CompletedConsultation> {
-    if (dto.nextIntents?.length) assertCanRouteClinically(actor.role);
+    if (dto.nextIntents?.length || dto.admission) {
+      assertCanRouteClinically(actor.role);
+    }
+    if (
+      !dto.admission &&
+      dto.nextIntents?.includes(VisitIntenentsEnum.ADMISSION)
+    ) {
+      throw new BadRequestException(
+        'Give a ward and reason to admit the patient',
+      );
+    }
     const consultation = await this.consultations.findEditable(id, actor);
     assertOpenForEditing(consultation);
     consultation.status = ConsultationStatus.COMPLETED;
     consultation.completedAt = new Date();
     consultation.completionNotes = dto.notes?.trim() || null;
-    await this.consultationsRepository.save(consultation);
+    await this.consultationsRepository.manager.transaction(async (manager) => {
+      await manager.save(consultation);
+      if (!dto.admission) return;
+      await this.admissions.admit(manager, dto.admission, {
+        patientId: consultation.patientId,
+        visitId: consultation.visitId ?? null,
+        consultationId: consultation.id,
+        admittedById: actor.id,
+      });
+    });
     const queueUpdate = await this.handOff(consultation, dto);
     return { consultation: await this.consultations.findOne(id), queueUpdate };
   }
@@ -68,9 +94,10 @@ export class ConsultationLifecycleService {
     dto: CompleteConsultationDto,
   ): Promise<QueueUpdate> {
     if (!consultation.visitId) return null;
+    const intents = dto.nextIntents ?? [];
     await this.queueEntries.routeFromDoctor(
       consultation.visitId,
-      dto.nextIntents ?? [],
+      dto.admission ? [...intents, VisitIntenentsEnum.ADMISSION] : intents,
       consultation.department,
     );
     return this.queueEntries.completeCurrentFor(

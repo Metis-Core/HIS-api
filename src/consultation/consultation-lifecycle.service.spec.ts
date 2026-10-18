@@ -2,6 +2,7 @@ import { ConflictException, ForbiddenException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { UserRole } from 'common/enums/userRoles.enum';
+import { AdmissionsService } from 'src/admissions/admissions.service';
 import { VisitIntenentsEnum } from 'src/queue/enums/visit-type.enum';
 import { QueueEntriesService } from 'src/queue/queue-entries.service';
 import { ConsultationLifecycleService } from './consultation-lifecycle.service';
@@ -9,7 +10,13 @@ import { ConsultationService } from './consultation.service';
 import { Consultation } from './entities/consultation.entity';
 import { ConsultationStatus } from './enums/consultation-status.enum';
 
-const repo = { save: jest.fn((value: Consultation) => value) };
+const save = jest.fn((value: Consultation) => value);
+const repo = {
+  save,
+  manager: {
+    transaction: jest.fn((work: (m: unknown) => unknown) => work({ save })),
+  },
+};
 const consultations = { findEditable: jest.fn(), findOne: jest.fn() };
 const queueEntries = {
   routeFromDoctor: jest.fn(),
@@ -36,6 +43,7 @@ describe('ConsultationLifecycleService', () => {
         { provide: getRepositoryToken(Consultation), useValue: repo },
         { provide: ConsultationService, useValue: consultations },
         { provide: QueueEntriesService, useValue: queueEntries },
+        { provide: AdmissionsService, useValue: { admit: jest.fn() } },
       ],
     }).compile();
     service = module.get(ConsultationLifecycleService);
