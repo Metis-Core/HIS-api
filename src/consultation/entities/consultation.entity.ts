@@ -71,11 +71,9 @@ export class Consultation extends BaseEntity {
   @Column({ type: 'text', nullable: true })
   historyOfPresentIllness: string | null;
 
+  // D2: one field for findings and assessment; its final name awaits client Decision 4.
   @Column({ type: 'text', nullable: true })
-  examinationFindings: string | null;
-
-  @Column({ type: 'text', nullable: true })
-  assessment: string | null;
+  examinationAndAssessment: string | null;
 
   @Column({ type: 'text', nullable: true })
   diagnosis: string | null;

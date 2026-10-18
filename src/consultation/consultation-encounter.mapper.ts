@@ -4,8 +4,7 @@ import { Consultation } from './entities/consultation.entity';
 /** Free-text encounter fields: trimmed, and an empty value clears the field. */
 export const ENCOUNTER_TEXT_FIELDS = [
   'historyOfPresentIllness',
-  'examinationFindings',
-  'assessment',
+  'examinationAndAssessment',
   'diagnosis',
   'plan',
   'notes',

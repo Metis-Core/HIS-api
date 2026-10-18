@@ -44,12 +44,8 @@ export class CreateConsultationDto {
   historyOfPresentIllness?: string;
 
   @IsOptional()
-  @IsString()
-  examinationFindings?: string;
-
-  @IsOptional()
-  @IsString()
-  assessment?: string;
+  @IsString({ message: 'Examination and assessment must be text' })
+  examinationAndAssessment?: string;
 
   @IsOptional()
   @IsString()

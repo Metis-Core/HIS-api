@@ -92,13 +92,8 @@ export function renderDischargeSummary({ consultation, labOrders, prescriptions 
                 : ''
             }
             ${
-              consultation.examinationFindings
-                ? `<mj-text class="label">Examination findings</mj-text><mj-text>${escape(consultation.examinationFindings)}</mj-text>`
-                : ''
-            }
-            ${
-              consultation.assessment
-                ? `<mj-text class="label">Assessment</mj-text><mj-text>${escape(consultation.assessment)}</mj-text>`
+              consultation.examinationAndAssessment
+                ? `<mj-text class="label">Examination and assessment</mj-text><mj-text>${escape(consultation.examinationAndAssessment)}</mj-text>`
                 : ''
             }
             ${
