@@ -2,7 +2,10 @@ import 'reflect-metadata';
 import { Logger } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { Service } from 'src/services/entities/service.entity';
-import { SERVICE_CATALOGUE } from '../seeds/service-catalogue';
+import {
+  SERVICE_CATALOGUE,
+  VACCINE_SERVICES,
+} from '../seeds/service-catalogue';
 import { buildDataSourceOptions } from '../typeorm.options';
 
 const logger = new Logger('SeedServiceCatalogue');
@@ -15,7 +18,7 @@ async function seed(): Promise<void> {
   const services = dataSource.getRepository(Service);
   const counts = { created: 0, coded: 0, unchanged: 0 };
   try {
-    for (const entry of SERVICE_CATALOGUE) {
+    for (const entry of [...SERVICE_CATALOGUE, ...VACCINE_SERVICES]) {
       const existing = await services
         .createQueryBuilder('service')
         .withDeleted()

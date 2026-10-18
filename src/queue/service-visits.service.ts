@@ -19,6 +19,8 @@ export const SERVICE_VISIT_INTENT: Record<
   VisitIntenentsEnum
 > = {
   [ServiceVisitKind.ANTENATAL]: VisitIntenentsEnum.ANTENATAL,
+  [ServiceVisitKind.DELIVERY]: VisitIntenentsEnum.DELIVERY,
+  [ServiceVisitKind.POSTNATAL]: VisitIntenentsEnum.POSTNATAL,
   [ServiceVisitKind.IMMUNIZATION]: VisitIntenentsEnum.IMMUNIZATION,
 };
 

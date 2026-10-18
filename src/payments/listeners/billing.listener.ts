@@ -1,5 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
+import { ConsultationStartedEvent } from 'src/consultation/events/consultation-started.event';
+import { ConsultationType } from 'src/consultation/enums/consultation-type.enum';
+import { ClinicRecordCreatedEvent } from 'src/clinic/events/clinic-record-created.event';
 import { PatientAdmittedEvent } from 'src/admissions/events/patient-admitted.event';
 import { LabOrderCreatedEvent } from 'src/lab/events/lab-order-created.event';
 import { OrderKind } from 'src/orders/enums/order-kind.enum';
@@ -9,12 +12,25 @@ import {
 } from 'src/orders/events/procedure-order.events';
 import { PrescriptionCancelledEvent } from 'src/pharmacy/events/prescription-cancelled.event';
 import { PrescriptionCreatedEvent } from 'src/pharmacy/events/prescription-created.event';
-import { ServiceCode, ServiceCodeValue } from 'src/services/service-codes';
+import { ServiceCode } from 'src/services/service-codes';
 import { QueueEntriesService } from 'src/queue/queue-entries.service';
 import { VisitCheckedInEvent } from 'src/queue/events/visit-checked-in.event';
 import { VisitIntenentsEnum } from 'src/queue/enums/visit-type.enum';
 import { ChargeSource } from '../enums/charge.enum';
 import { PaymentsService } from '../payments.service';
+
+const BILLED_CONSULTATIONS: readonly ConsultationType[] = [
+  ConsultationType.OUTPATIENT,
+  ConsultationType.EMERGENCY,
+  ConsultationType.TELEMEDICINE,
+];
+
+const SERVICE_VISIT_CODE = {
+  [VisitIntenentsEnum.ANTENATAL]: ServiceCode.ANTENATAL_VISIT,
+  [VisitIntenentsEnum.DELIVERY]: ServiceCode.DELIVERY,
+  [VisitIntenentsEnum.POSTNATAL]: ServiceCode.POSTNATAL_VISIT,
+  [VisitIntenentsEnum.IMMUNIZATION]: ServiceCode.IMMUNIZATION,
+} as const;
 
 @Injectable()
 export class BillingListener {
@@ -47,16 +63,11 @@ export class BillingListener {
     }
   }
 
-  // Antenatal and immunization visits bill their service line (often free); a paid one also queues billing.
+  // Antenatal, delivery, postnatal and immunization visits bill their service line (often free); a paid one also queues billing.
   private async billServiceVisit(event: VisitCheckedInEvent) {
-    const code: ServiceCodeValue | null = event.intents.includes(
-      VisitIntenentsEnum.ANTENATAL,
-    )
-      ? ServiceCode.ANTENATAL_VISIT
-      : event.intents.includes(VisitIntenentsEnum.IMMUNIZATION)
-        ? ServiceCode.IMMUNIZATION
-        : null;
-    if (!code) return;
+    const intent = event.intents.find((i) => i in SERVICE_VISIT_CODE);
+    if (!intent) return;
+    const code = SERVICE_VISIT_CODE[intent as keyof typeof SERVICE_VISIT_CODE];
     try {
       const charge = await this.payments.addServiceFee(
         event.visitId,
@@ -72,6 +83,37 @@ export class BillingListener {
     } catch (error) {
       this.logger.error(
         `Failed to bill ${code} for visit ${event.visitId}`,
+        error as Error,
+      );
+    }
+  }
+
+  // A vaccine outside the free national programme is billed when it is recorded.
+  @OnEvent(ClinicRecordCreatedEvent.channel, { async: true })
+  async onClinicRecordCreated(event: ClinicRecordCreatedEvent) {
+    if (!event.visitId || !event.vaccineServiceCode) return;
+    try {
+      await this.payments.addServiceFee(
+        event.visitId,
+        event.vaccineServiceCode,
+        event.recordedById,
+      );
+    } catch (error) {
+      this.logger.error(
+        `Failed to bill vaccine for record ${event.recordId}`,
+        error as Error,
+      );
+    }
+  }
+
+  @OnEvent(ConsultationStartedEvent.channel, { async: true })
+  async onConsultationStarted(event: ConsultationStartedEvent) {
+    if (!BILLED_CONSULTATIONS.includes(event.type)) return;
+    try {
+      await this.payments.addConsultationFee(event.visitId, event.doctorId);
+    } catch (error) {
+      this.logger.error(
+        `Failed to bill consultation ${event.consultationId}`,
         error as Error,
       );
     }

@@ -1,3 +1,7 @@
+import { ClinicRecordKind } from 'src/clinic/enums/clinic-record-kind.enum';
+import { ClinicRecordCreatedEvent } from 'src/clinic/events/clinic-record-created.event';
+import { ConsultationType } from 'src/consultation/enums/consultation-type.enum';
+import { ConsultationStartedEvent } from 'src/consultation/events/consultation-started.event';
 import { PatientAdmittedEvent } from 'src/admissions/events/patient-admitted.event';
 import { PrescriptionCancelledEvent } from 'src/pharmacy/events/prescription-cancelled.event';
 import { PrescriptionCreatedEvent } from 'src/pharmacy/events/prescription-created.event';
@@ -143,5 +147,82 @@ describe('BillingListener', () => {
 
     // Assert
     expect(payments.addPrescriptionCharges).not.toHaveBeenCalled();
+  });
+
+  it('bills a delivery at check-in and queues billing for its fee', async () => {
+    // Arrange
+    payments.addServiceFee.mockResolvedValue({ id: 'charge', amount: 200000 });
+
+    // Act
+    await listener.onVisitCheckedIn(
+      new VisitCheckedInEvent('v1', 'p1', 'n1', [VisitIntenentsEnum.DELIVERY]),
+    );
+
+    // Assert
+    expect(payments.addServiceFee).toHaveBeenCalledWith(
+      'v1',
+      ServiceCode.DELIVERY,
+      'n1',
+    );
+    expect(queueEntries.ensureIntent).toHaveBeenCalledWith(
+      'v1',
+      VisitIntenentsEnum.BILLING,
+    );
+  });
+
+  it('adds the consultation fee when the doctor opens an outpatient consultation, but not for a ward round', async () => {
+    // Act
+    await listener.onConsultationStarted(
+      new ConsultationStartedEvent(
+        'c1',
+        'v1',
+        'd1',
+        ConsultationType.OUTPATIENT,
+      ),
+    );
+    await listener.onConsultationStarted(
+      new ConsultationStartedEvent(
+        'c2',
+        'v1',
+        'd1',
+        ConsultationType.INPATIENT_ROUND,
+      ),
+    );
+
+    // Assert
+    expect(payments.addConsultationFee).toHaveBeenCalledTimes(1);
+    expect(payments.addConsultationFee).toHaveBeenCalledWith('v1', 'd1');
+  });
+
+  it('bills a private vaccine when it is recorded, and nothing for a free one', async () => {
+    // Act
+    await listener.onClinicRecordCreated(
+      new ClinicRecordCreatedEvent(
+        'r1',
+        ClinicRecordKind.IMMUNIZATION,
+        'p1',
+        'v1',
+        'n1',
+        'VAC_TYPHOID',
+      ),
+    );
+    await listener.onClinicRecordCreated(
+      new ClinicRecordCreatedEvent(
+        'r2',
+        ClinicRecordKind.IMMUNIZATION,
+        'p1',
+        'v1',
+        'n1',
+        null,
+      ),
+    );
+
+    // Assert
+    expect(payments.addServiceFee).toHaveBeenCalledTimes(1);
+    expect(payments.addServiceFee).toHaveBeenCalledWith(
+      'v1',
+      'VAC_TYPHOID',
+      'n1',
+    );
   });
 });

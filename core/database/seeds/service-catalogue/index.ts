@@ -1,3 +1,4 @@
+import { PRIVATE_VACCINES } from 'src/clinic/vaccines';
 import { ServiceCode } from 'src/services/service-codes';
 
 export interface SeedService {
@@ -25,7 +26,12 @@ export const SERVICE_CATALOGUE: SeedService[] = [
     fee: 0,
     description: FREE,
   },
-  { name: 'Postnatal care visit', fee: 0, description: FREE },
+  {
+    code: ServiceCode.POSTNATAL_VISIT,
+    name: 'Postnatal care visit',
+    fee: 0,
+    description: FREE,
+  },
   {
     code: ServiceCode.IMMUNIZATION,
     name: 'Routine immunization (UNEPI)',
@@ -35,7 +41,12 @@ export const SERVICE_CATALOGUE: SeedService[] = [
   { name: 'Child growth monitoring', fee: 0, description: FREE },
   { name: 'Family planning counselling', fee: 0, description: FREE },
   { name: 'HIV counselling and testing', fee: 0, description: FREE },
-  { name: 'Normal delivery', fee: 200000 },
+  {
+    code: ServiceCode.DELIVERY,
+    name: 'Normal delivery',
+    fee: 200000,
+    description: 'Charged when a patient is checked in to give birth',
+  },
   {
     code: ServiceCode.ADMISSION_FEE,
     name: 'Admission fee',
@@ -56,3 +67,23 @@ export const SERVICE_CATALOGUE: SeedService[] = [
   { name: 'IV cannulation and drip set-up', fee: 15000 },
   { name: 'Medical report or certificate', fee: 30000 },
 ];
+
+// Average private-clinic prices (UGX) for vaccines outside the free national programme.
+const PRIVATE_VACCINE_FEES: Record<string, number> = {
+  VAC_TYPHOID: 50000,
+  VAC_HEPB_ADULT: 35000,
+  VAC_HEPA: 90000,
+  VAC_FLU: 60000,
+  VAC_RABIES: 45000,
+  VAC_MENACWY: 150000,
+  VAC_VARICELLA: 90000,
+};
+
+export const VACCINE_SERVICES: SeedService[] = PRIVATE_VACCINES.map(
+  (vaccine) => ({
+    code: vaccine.serviceCode,
+    name: `Vaccine: ${vaccine.name}`,
+    fee: PRIVATE_VACCINE_FEES[vaccine.serviceCode as string],
+    description: 'Private vaccine, per dose',
+  }),
+);

@@ -1,4 +1,5 @@
 import { Admission } from 'src/admissions/entities/admission.entity';
+import { ClinicRecord } from 'src/clinic/entities/clinic-record.entity';
 import { AuditLog } from 'src/auditLogs/entities/audit-log.entity';
 import { AuthToken } from 'src/auth/entities/auth-token.entity';
 import { AvailabilityPeriod } from 'src/availability/entities/availability-period.entity';
@@ -49,6 +50,7 @@ export const entities = [
   ConsultationDiagnosis,
   DiagnosisCode,
   Admission,
+  ClinicRecord,
   OneTimePassword,
   Service,
   Notification,

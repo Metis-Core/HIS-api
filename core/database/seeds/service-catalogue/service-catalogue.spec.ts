@@ -1,5 +1,5 @@
 import { SERVICE_CODE_PATTERN, ServiceCode } from 'src/services/service-codes';
-import { SERVICE_CATALOGUE } from './index';
+import { SERVICE_CATALOGUE, VACCINE_SERVICES } from './index';
 
 describe('service catalogue', () => {
   it('has unique names and codes, and valid codes', () => {
@@ -21,5 +21,11 @@ describe('service catalogue', () => {
     expect(byCode(ServiceCode.IMMUNIZATION)?.fee).toBe(0);
     expect(byCode(ServiceCode.ANTENATAL_VISIT)?.fee).toBe(0);
     expect(byCode(ServiceCode.CONSULTATION)?.fee).toBeGreaterThan(0);
+  });
+
+  it('prices every private vaccine under a unique code', () => {
+    const codes = VACCINE_SERVICES.map((s) => s.code);
+    expect(new Set(codes).size).toBe(codes.length);
+    VACCINE_SERVICES.forEach((s) => expect(s.fee).toBeGreaterThan(0));
   });
 });

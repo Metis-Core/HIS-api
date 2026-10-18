@@ -2,7 +2,6 @@ import { BadRequestException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { BaseCrudService } from 'common/services/crud.service';
-import { ServiceCodeValue } from 'src/services/service-codes';
 import { ServicesService } from 'src/services/services.service';
 import { InvoicesService } from './invoices.service';
 import { CreateVisitChargeDto } from './dto/create-visit-charge.dto';
@@ -73,6 +72,10 @@ export class PaymentsService extends BaseCrudService<VisitCharge> {
     visitId: string,
     addedById: string,
   ): Promise<VisitCharge | null> {
+    const existing = await this.charges.findOne({
+      where: { visitId, source: ChargeSource.CONSULTATION },
+    });
+    if (existing) return existing;
     const service = await this.servicesService.findConsultationService();
     if (!service) return null;
     return this.record({
@@ -89,7 +92,7 @@ export class PaymentsService extends BaseCrudService<VisitCharge> {
   /** Bills a priced service looked up by its code; a fee of 0 is recorded as a free line. */
   async addServiceFee(
     visitId: string,
-    code: ServiceCodeValue,
+    code: string,
     addedById: string,
   ): Promise<VisitCharge | null> {
     const service = await this.servicesService.findActiveByCode(code);

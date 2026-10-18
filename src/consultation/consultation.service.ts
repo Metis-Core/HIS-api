@@ -1,4 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Department } from 'common/enums/department.enum';
@@ -17,6 +18,7 @@ import {
 import { assertOpenForEditing } from './consultation-lock.policy';
 import { ConsultationReferencesService } from './consultation-references.service';
 import { ConsultationDiagnosisDTO } from './dto/consultation-diagnosis.dto';
+import { ConsultationStartedEvent } from './events/consultation-started.event';
 import { CreateConsultationDto } from './dto/create-consultation.dto';
 import { UpdateConsultationDto } from './dto/update-consultation.dto';
 import { Consultation } from './entities/consultation.entity';
@@ -31,6 +33,7 @@ export class ConsultationService extends BaseCrudService<Consultation> {
     private readonly references: ConsultationReferencesService,
     private readonly diagnoses: ConsultationDiagnosesService,
     private readonly assignment: DoctorAssignmentService,
+    private readonly events: EventEmitter2,
   ) {
     super(consultationsRepository);
   }
@@ -64,6 +67,17 @@ export class ConsultationService extends BaseCrudService<Consultation> {
       completedAt: null,
     });
     const saved = await this.persist(consultation, dto.diagnoses);
+    if (saved.visitId) {
+      this.events.emit(
+        ConsultationStartedEvent.channel,
+        new ConsultationStartedEvent(
+          saved.id,
+          saved.visitId,
+          doctorId,
+          saved.type,
+        ),
+      );
+    }
     return this.findOne(saved.id);
   }
 

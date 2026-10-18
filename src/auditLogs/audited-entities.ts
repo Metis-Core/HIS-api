@@ -1,3 +1,4 @@
+import { ClinicRecord } from 'src/clinic/entities/clinic-record.entity';
 import { Admission } from 'src/admissions/entities/admission.entity';
 import { LabAttachment } from 'src/lab/attachments/lab-attachment.entity';
 import { ProcedureOrder } from 'src/orders/entities/procedure-order.entity';
@@ -17,6 +18,7 @@ export const AUDITED_ENTITIES = new Map<unknown, string>([
   [User, 'user'],
   [Service, 'service'],
   [Admission, 'admission'],
+  [ClinicRecord, 'clinic_record'],
   [LabAttachment, 'lab_attachment'],
   [ProcedureOrder, 'procedure_order'],
   [ProcedureTest, 'procedure_test'],
