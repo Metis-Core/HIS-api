@@ -12,6 +12,7 @@ import { User } from 'src/users/entities/user.entity';
 import { VisitStatusEnum } from 'src/queue/enums/visit-status.enum';
 import { VisitTypeEnum } from 'src/queue/enums/visit-type.enum';
 import { TriageCategory } from 'src/queue/enums/triage-category.enum';
+import { AssignmentSource } from 'src/queue/enums/assignment-source.enum';
 import { QueueEntry } from 'src/queue/entities/queue-entry.entity';
 
 @Entity('visits')
@@ -52,6 +53,20 @@ export class Visit extends BaseEntity {
   @ManyToOne(() => User, { onDelete: 'RESTRICT' })
   @JoinColumn({ name: 'checkedInById' })
   checkedInBy: User;
+
+  @Index()
+  @Column({ type: 'uuid', nullable: true })
+  assignedDoctorId: string | null;
+
+  @ManyToOne(() => User, { nullable: true, onDelete: 'SET NULL' })
+  @JoinColumn({ name: 'assignedDoctorId' })
+  assignedDoctor: User | null;
+
+  @Column({ type: 'timestamp', nullable: true })
+  assignedAt: Date | null;
+
+  @Column({ type: 'enum', enum: AssignmentSource, nullable: true })
+  assignmentSource: AssignmentSource | null;
 
   @OneToMany(() => QueueEntry, (entry) => entry.visit)
   queueEntries: QueueEntry[];
