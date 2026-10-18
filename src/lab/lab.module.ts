@@ -17,6 +17,8 @@ import { LabOrder } from './entities/lab-order.entity';
 import { LabResultAmendment } from './entities/lab-result-amendment.entity';
 import { LabTest } from './entities/lab-test.entity';
 import { LabBoardController } from './lab-board.controller';
+import { LabReportsController } from './reports/lab-reports.controller';
+import { LabReportsService } from './reports/lab-reports.service';
 import { LabBoardService } from './lab-board.service';
 import { LabController } from './lab.controller';
 import { LabOrderIntakeService } from './lab-order-intake.service';
@@ -50,6 +52,7 @@ import { LabTestsService } from './lab-tests.service';
     LabResultsController,
     LabBoardController,
     LabAttachmentsController,
+    LabReportsController,
   ],
   providers: [
     LabTestsService,
@@ -60,6 +63,7 @@ import { LabTestsService } from './lab-tests.service';
     LabAmendmentsService,
     LabBoardService,
     LabAttachmentsService,
+    LabReportsService,
     { provide: FileStorage, useClass: DiskFileStorage },
   ],
   exports: [LabTestsService, LabOrdersService, LabOrderIntakeService],
