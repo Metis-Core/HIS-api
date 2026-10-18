@@ -5,6 +5,8 @@ import { ConsciousnessLevel } from 'src/traige/enums/consciousness-level.enum';
 import { TriageStatus } from 'src/traige/enums/triage-status.enum';
 import { PatientsService } from 'src/patients/patients.service';
 import { QueueEntriesService } from 'src/queue/queue-entries.service';
+import { VisitsService } from 'src/queue/visit.service';
+import { categoryForAcuity } from 'src/queue/journey/visit-priority';
 import { UsersService } from 'src/users/users.service';
 import { Department } from 'common/enums/department.enum';
 import { VisitIntenentsEnum } from 'src/queue/enums/visit-type.enum';
@@ -22,6 +24,7 @@ export class TraigeService extends BaseCrudService<Triage> {
     private readonly patientsService: PatientsService,
     private readonly usersService: UsersService,
     private readonly queueEntries: QueueEntriesService,
+    private readonly visits: VisitsService,
   ) {
     super(triageRepository);
   }
@@ -77,6 +80,10 @@ export class TraigeService extends BaseCrudService<Triage> {
     const triageRecord = await this.findOne(saved.id);
 
     if (dto.visitId) {
+      await this.visits.raiseCategory(
+        dto.visitId,
+        categoryForAcuity(triageRecord.acuity),
+      );
       if (
         triageRecord.status === TriageStatus.COMPLETED ||
         triageRecord.status === TriageStatus.REFERRED
@@ -283,6 +290,10 @@ export class TraigeService extends BaseCrudService<Triage> {
     const updated = await this.findOne(id);
 
     if (dto.visitId) {
+      await this.visits.raiseCategory(
+        dto.visitId,
+        categoryForAcuity(updated.acuity),
+      );
       if (
         updated.status === TriageStatus.COMPLETED ||
         updated.status === TriageStatus.REFERRED

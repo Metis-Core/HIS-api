@@ -4,6 +4,7 @@ import {
   Delete,
   Get,
   Param,
+  Patch,
   ParseEnumPipe,
   ParseUUIDPipe,
   Post,
@@ -22,6 +23,7 @@ import { formatResponse } from '../../common/response-format';
 import { CreateVisitDTO } from './dto/create-visit.dto';
 import { UpdateVisitDTO } from './dto/update-visit.dto';
 import { AppendIntentsDTO } from './dto/append-intents.dto';
+import { ChangePriorityDTO } from './dto/change-priority.dto';
 import { assertCanRouteClinically } from './journey/assert-can-route';
 
 @Controller('visits')
@@ -142,6 +144,22 @@ export class VisitController {
       ...entity,
       handler: user.id,
     });
+    return formatResponse(visit);
+  }
+
+  @Patch(':id/priority')
+  @Roles(RoleGroups.PRIORITY_MANAGERS)
+  async changePriority(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: ChangePriorityDTO,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    const visit = await this.visitService.changePriority(
+      id,
+      body.triageCategory,
+      body.reason,
+      user.id,
+    );
     return formatResponse(visit);
   }
 

@@ -11,6 +11,7 @@ import { Patient } from 'src/patients/entities/patient.entity';
 import { User } from 'src/users/entities/user.entity';
 import { VisitStatusEnum } from 'src/queue/enums/visit-status.enum';
 import { VisitTypeEnum } from 'src/queue/enums/visit-type.enum';
+import { TriageCategory } from 'src/queue/enums/triage-category.enum';
 import { QueueEntry } from 'src/queue/entities/queue-entry.entity';
 
 @Entity('visits')
@@ -33,6 +34,17 @@ export class Visit extends BaseEntity {
     default: VisitStatusEnum.OPEN,
   })
   status: VisitStatusEnum;
+
+  @Column({ type: 'enum', enum: TriageCategory, nullable: true })
+  triageCategory: TriageCategory | null;
+
+  /** EM-YYYYMMDD-NNN, issued at registration for emergency arrivals. */
+  @Column({ type: 'varchar', length: 32, unique: true, nullable: true })
+  emergencyNumber: string | null;
+
+  // Copied onto every queue entry of the visit so each department sorts by it.
+  @Column({ type: 'int', default: 5 })
+  priority: number;
 
   @Column({ type: 'uuid' })
   checkedInById: string;

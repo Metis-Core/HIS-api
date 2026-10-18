@@ -9,6 +9,8 @@ import { In, Repository } from 'typeorm';
 import { Department } from 'common/enums/department.enum';
 import { UserRole } from 'common/enums/userRoles.enum';
 import { QueueEntry } from './entities/queue-entry.entity';
+import { Visit } from './entities/visit.entity';
+import { DEFAULT_PRIORITY } from './journey/visit-priority';
 import { QueueEntryStatus } from './enums/queue-entry-status.enum';
 import { VisitIntenentsEnum } from './enums/visit-type.enum';
 import {
@@ -39,6 +41,8 @@ export class QueueEntriesService {
   constructor(
     @InjectRepository(QueueEntry)
     private readonly entries: Repository<QueueEntry>,
+    @InjectRepository(Visit)
+    private readonly visits: Repository<Visit>,
     private readonly events: EventEmitter2,
   ) {}
 
@@ -227,12 +231,17 @@ export class QueueEntriesService {
       take: 1,
     });
     const startSeq = (existing[0]?.sequenceNumber ?? 0) + 1;
+    const visit = await this.visits.findOne({
+      where: { id: visitId },
+      select: { id: true, priority: true },
+    });
+    const priority = visit?.priority ?? DEFAULT_PRIORITY;
     const rows = stages.map((stage, i) =>
       this.entries.create({
         visitId,
         department: intentDepartmentMap[stage.intent],
         status: QueueEntryStatus.WAITING,
-        priority: 5,
+        priority,
         sequenceNumber: startSeq + i,
         metadata: stage.review ? { review: true } : null,
       }),
