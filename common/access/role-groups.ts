@@ -48,6 +48,10 @@ export const RoleGroups = {
     UserRole.ACCOUNTANT,
   ]),
 
+  CLINICAL_ROUTERS: define('Doctors, the only staff who may route a patient to lab, radiology, pharmacy or surgery.', [
+    UserRole.DOCTOR,
+  ]),
+
   RECEPTION: define('Administrators and reception managing check-in and cancellations.', [
     UserRole.SUPER_ADMIN,
     UserRole.ADMIN,

@@ -19,6 +19,8 @@ import { Consultation } from './entities/consultation.entity';
 import { ConsultationStatus } from './enums/consultation-status.enum';
 import { ConsultationType } from './enums/consultation-type.enum';
 import { BaseCrudService } from '../../common/services/crud.service';
+import { UserRole } from 'common/enums/userRoles.enum';
+import { assertCanRouteClinically } from 'src/queue/journey/assert-can-route';
 
 @Injectable()
 export class ConsultationService extends BaseCrudService<Consultation> {
@@ -78,8 +80,7 @@ export class ConsultationService extends BaseCrudService<Consultation> {
       notes: dto.notes?.trim() ?? null,
       followUpDate: dto.followUpDate ?? null,
       startedAt: dto.startedAt ? new Date(dto.startedAt) : now,
-      completedAt:
-        dto.status === ConsultationStatus.COMPLETED ? now : null,
+      completedAt: dto.status === ConsultationStatus.COMPLETED ? now : null,
     });
 
     const saved = await this.consultationsRepository.save(consultation);
@@ -218,7 +219,10 @@ export class ConsultationService extends BaseCrudService<Consultation> {
       throw new BadRequestException('Cancelled consultation cannot be edited');
     }
 
-    if (dto.patientId !== undefined && dto.patientId !== consultation.patientId) {
+    if (
+      dto.patientId !== undefined &&
+      dto.patientId !== consultation.patientId
+    ) {
       await this.patientsService.findOne(dto.patientId);
       consultation.patientId = dto.patientId;
     }
@@ -291,13 +295,19 @@ export class ConsultationService extends BaseCrudService<Consultation> {
   async complete(
     id: string,
     dto: CompleteConsultationDto,
+    actorRole?: UserRole,
   ): Promise<{
     consultation: Consultation;
     queueUpdate: unknown | null;
   }> {
+    if (actorRole && dto.nextIntents?.length) {
+      assertCanRouteClinically(actorRole);
+    }
     const consultation = await this.findOne(id);
     if (consultation.status === ConsultationStatus.CANCELLED) {
-      throw new BadRequestException('Cancelled consultation cannot be completed');
+      throw new BadRequestException(
+        'Cancelled consultation cannot be completed',
+      );
     }
 
     if (consultation.status !== ConsultationStatus.COMPLETED) {
@@ -313,8 +323,8 @@ export class ConsultationService extends BaseCrudService<Consultation> {
     if (consultation.visitId) {
       await this.queueEntries.routeFromDoctor(
         consultation.visitId,
-        consultation.department,
         dto.nextIntents ?? [],
+        consultation.department,
       );
       const result = await this.queueEntries.completeCurrentFor(
         consultation.visitId,

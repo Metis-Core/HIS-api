@@ -91,8 +91,9 @@ export class ConsultationController {
   complete(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: CompleteConsultationDto,
+    @CurrentUser() user: AuthenticatedUser,
   ) {
-    return this.consultationService.complete(id, dto);
+    return this.consultationService.complete(id, dto, user.role);
   }
 
   @Post(':id/cancel')
@@ -115,7 +116,8 @@ export class ConsultationController {
   @HttpCode(HttpStatus.CREATED)
   async createLabOrder(
     @Param('id', ParseUUIDPipe) id: string,
-    @Body() dto: Omit<CreateLabOrderDto, 'consultationId' | 'patientId'> & {
+    @Body()
+    dto: Omit<CreateLabOrderDto, 'consultationId' | 'patientId'> & {
       patientId?: string;
     },
     @CurrentUser() user: AuthenticatedUser,
@@ -137,7 +139,8 @@ export class ConsultationController {
   @HttpCode(HttpStatus.CREATED)
   async createPrescription(
     @Param('id', ParseUUIDPipe) id: string,
-    @Body() dto: Omit<CreatePrescriptionDto, 'consultationId' | 'patientId'> & {
+    @Body()
+    dto: Omit<CreatePrescriptionDto, 'consultationId' | 'patientId'> & {
       patientId?: string;
     },
     @CurrentUser() user: AuthenticatedUser,

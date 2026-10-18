@@ -81,6 +81,7 @@ export class Triage extends BaseEntity {
   allergiesNoted: string | null;
 
   @Column({ type: 'enum', enum: Department, nullable: true })
+  /** @deprecated Triage only recommends a consultation now; kept read-only for historical rows. */
   referredToDepartment: Department | null;
 
   @Column({ type: 'timestamp' })

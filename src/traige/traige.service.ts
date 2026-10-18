@@ -1,7 +1,4 @@
-import {
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { ConsciousnessLevel } from 'src/traige/enums/consciousness-level.enum';
@@ -70,7 +67,6 @@ export class TraigeService extends BaseCrudService<Triage> {
       heightCm: dto.heightCm !== undefined ? String(dto.heightCm) : null,
       painScore: dto.painScore ?? null,
       allergiesNoted: dto.allergiesNoted?.trim() ?? null,
-      referredToDepartment: dto.referredToDepartment ?? null,
       arrivedAt: dto.arrivedAt ? new Date(dto.arrivedAt) : now,
       triagedAt: dto.triagedAt ? new Date(dto.triagedAt) : now,
       completedAt: null,
@@ -179,7 +175,9 @@ export class TraigeService extends BaseCrudService<Triage> {
     });
   }
 
-  async findQueue(status: TriageStatus = TriageStatus.WAITING): Promise<Triage[]> {
+  async findQueue(
+    status: TriageStatus = TriageStatus.WAITING,
+  ): Promise<Triage[]> {
     return this.triageRepository
       .createQueryBuilder('triage')
       .leftJoinAndSelect('triage.patient', 'patient')
@@ -268,9 +266,6 @@ export class TraigeService extends BaseCrudService<Triage> {
     if (dto.allergiesNoted !== undefined) {
       triage.allergiesNoted = dto.allergiesNoted?.trim() || null;
     }
-    if (dto.referredToDepartment !== undefined) {
-      triage.referredToDepartment = dto.referredToDepartment;
-    }
     if (dto.arrivedAt !== undefined) {
       triage.arrivedAt = new Date(dto.arrivedAt);
     }
@@ -306,8 +301,12 @@ export class TraigeService extends BaseCrudService<Triage> {
     return this.triageRepository.save(triage);
   }
 
+  // Triage can only recommend the doctor's consultation; further routing is the doctor's (R6).
   private async syncVisitQueue(visitId: string, triage: Triage): Promise<void> {
     await this.queueEntries.completeCurrentFor(visitId, Department.TRIAGE);
-    await this.queueEntries.ensureIntent(visitId, VisitIntenentsEnum.CONSULTATION);
+    await this.queueEntries.ensureIntent(
+      visitId,
+      VisitIntenentsEnum.CONSULTATION,
+    );
   }
 }

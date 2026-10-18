@@ -1,8 +1,13 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 import { Department } from 'common/enums/department.enum';
+import { UserRole } from 'common/enums/userRoles.enum';
 import { QueueEntry } from './entities/queue-entry.entity';
 import { QueueEntryStatus } from './enums/queue-entry-status.enum';
 import { VisitIntenentsEnum } from './enums/visit-type.enum';
@@ -13,6 +18,7 @@ import {
   QueueEntryStartedEvent,
 } from './events/queue.events';
 import { intentDepartmentMap } from './intent-department.map';
+import { canActOnStage } from './journey/department-access.policy';
 import { PlannedStage, planDoctorRouting } from './journey/routing-plan';
 import { assertTransition } from './queue-state-machine';
 
@@ -21,6 +27,12 @@ const OPEN_STATUSES: readonly QueueEntryStatus[] = [
   QueueEntryStatus.CALLED,
   QueueEntryStatus.IN_SERVICE,
 ];
+
+/** The signed-in user acting on a queue entry; omitted for system-driven transitions. */
+export interface StageActor {
+  id: string;
+  role: UserRole;
+}
 
 @Injectable()
 export class QueueEntriesService {
@@ -62,8 +74,22 @@ export class QueueEntriesService {
     return entry;
   }
 
-  async call(id: string, userId: string): Promise<QueueEntry> {
+  private async findOneForActor(
+    id: string,
+    actor?: StageActor,
+  ): Promise<QueueEntry> {
     const entry = await this.findOneOrFail(id);
+    if (actor && !canActOnStage(actor.role, entry.department)) {
+      throw new ForbiddenException(
+        `Role '${actor.role}' cannot act on the ${entry.department} queue`,
+      );
+    }
+    return entry;
+  }
+
+  async call(id: string, actor: StageActor): Promise<QueueEntry> {
+    const entry = await this.findOneForActor(id, actor);
+    const userId = actor.id;
     assertTransition(entry.status, QueueEntryStatus.CALLED);
     entry.status = QueueEntryStatus.CALLED;
     entry.calledAt = new Date();
@@ -73,8 +99,9 @@ export class QueueEntriesService {
     return entry;
   }
 
-  async start(id: string, userId: string): Promise<QueueEntry> {
-    const entry = await this.findOneOrFail(id);
+  async start(id: string, actor: StageActor): Promise<QueueEntry> {
+    const entry = await this.findOneForActor(id, actor);
+    const userId = actor.id;
     assertTransition(entry.status, QueueEntryStatus.IN_SERVICE);
     entry.status = QueueEntryStatus.IN_SERVICE;
     entry.startedAt = new Date();
@@ -87,8 +114,9 @@ export class QueueEntriesService {
   async complete(
     id: string,
     notes?: string,
+    actor?: StageActor,
   ): Promise<{ entry: QueueEntry; next: QueueEntry | null }> {
-    const entry = await this.findOneOrFail(id);
+    const entry = await this.findOneForActor(id, actor);
     if (entry.status !== QueueEntryStatus.COMPLETED) {
       assertTransition(entry.status, QueueEntryStatus.COMPLETED);
       entry.status = QueueEntryStatus.COMPLETED;
@@ -104,8 +132,9 @@ export class QueueEntriesService {
   async skip(
     id: string,
     notes?: string,
+    actor?: StageActor,
   ): Promise<{ entry: QueueEntry; next: QueueEntry | null }> {
-    const entry = await this.findOneOrFail(id);
+    const entry = await this.findOneForActor(id, actor);
     assertTransition(entry.status, QueueEntryStatus.SKIPPED);
     entry.status = QueueEntryStatus.SKIPPED;
     entry.completedAt = new Date();
@@ -168,14 +197,16 @@ export class QueueEntriesService {
   /** Queues the doctor's requested stages in journey order (diagnostics, review, treatment, billing). */
   async routeFromDoctor(
     visitId: string,
-    doctorDepartment: Department,
     requested: VisitIntenentsEnum[],
+    completingDepartment?: Department,
   ): Promise<QueueEntry[]> {
     const open = await this.entries.find({
       where: { visitId, status: In(OPEN_STATUSES as QueueEntryStatus[]) },
       order: { sequenceNumber: 'ASC' },
     });
-    const current = open.find((entry) => entry.department === doctorDepartment);
+    const current = completingDepartment
+      ? open.find((entry) => entry.department === completingDepartment)
+      : undefined;
     const openDepartments = open
       .filter((entry) => entry.id !== current?.id)
       .map((entry) => entry.department);

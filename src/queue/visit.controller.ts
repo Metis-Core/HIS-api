@@ -21,6 +21,8 @@ import { VisitsService } from './visit.service';
 import { formatResponse } from '../../common/response-format';
 import { CreateVisitDTO } from './dto/create-visit.dto';
 import { UpdateVisitDTO } from './dto/update-visit.dto';
+import { AppendIntentsDTO } from './dto/append-intents.dto';
+import { assertCanRouteClinically } from './journey/assert-can-route';
 
 @Controller('visits')
 export class VisitController {
@@ -71,7 +73,7 @@ export class VisitController {
     @Param('id', ParseUUIDPipe) id: string,
     @CurrentUser() user: AuthenticatedUser,
   ) {
-    const entry = await this.queueEntries.call(id, user.id);
+    const entry = await this.queueEntries.call(id, user);
     return formatResponse(entry);
   }
 
@@ -81,7 +83,7 @@ export class VisitController {
     @Param('id', ParseUUIDPipe) id: string,
     @CurrentUser() user: AuthenticatedUser,
   ) {
-    const entry = await this.queueEntries.start(id, user.id);
+    const entry = await this.queueEntries.start(id, user);
     return formatResponse(entry);
   }
 
@@ -89,9 +91,10 @@ export class VisitController {
   @Roles(RoleGroups.FLOOR_STAFF)
   async completeEntry(
     @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() user: AuthenticatedUser,
     @Body('notes') notes?: string,
   ) {
-    const result = await this.queueEntries.complete(id, notes);
+    const result = await this.queueEntries.complete(id, notes, user);
     return formatResponse(result);
   }
 
@@ -99,9 +102,10 @@ export class VisitController {
   @Roles(RoleGroups.FLOOR_STAFF)
   async skipEntry(
     @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() user: AuthenticatedUser,
     @Body('notes') notes?: string,
   ) {
-    const result = await this.queueEntries.skip(id, notes);
+    const result = await this.queueEntries.skip(id, notes, user);
     return formatResponse(result);
   }
 
@@ -113,14 +117,16 @@ export class VisitController {
   }
 
   @Post('/queue/visit/:visitId/append')
-  @Roles(RoleGroups.PROVIDERS)
+  @Roles(RoleGroups.CLINICAL_ROUTERS)
   async appendVisitIntents(
     @Param('visitId', ParseUUIDPipe) visitId: string,
-    @Body('intents') intents: string[],
+    @Body() body: AppendIntentsDTO,
+    @CurrentUser() user: AuthenticatedUser,
   ) {
-    const created = await this.queueEntries.appendIntents(
+    assertCanRouteClinically(user.role);
+    const created = await this.queueEntries.routeFromDoctor(
       visitId,
-      (intents ?? []) as any,
+      body.intents,
     );
     return formatResponse(created);
   }
