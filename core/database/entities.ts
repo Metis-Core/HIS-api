@@ -3,6 +3,7 @@ import { AuthToken } from 'src/auth/entities/auth-token.entity';
 import { ConsultationAddendum } from 'src/consultation/entities/consultation-addendum.entity';
 import { Consultation } from 'src/consultation/entities/consultation.entity';
 import { Contact } from 'src/contacts/entities/contact.entity';
+import { DiagnosisCode } from 'src/diagnoses/entities/diagnosis-code.entity';
 import { InventoryItem } from 'src/inventory/entities/inventory-item.entity';
 import { InventoryStock } from 'src/inventory/entities/inventory-stock.entity';
 import { InventoryStore } from 'src/inventory/entities/inventory-store.entity';
@@ -34,6 +35,7 @@ export const entities = [
   QueueEntry,
   Consultation,
   ConsultationAddendum,
+  DiagnosisCode,
   OneTimePassword,
   Service,
   Notification,
