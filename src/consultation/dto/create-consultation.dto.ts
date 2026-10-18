@@ -1,4 +1,7 @@
+import { Type } from 'class-transformer';
 import {
+  ArrayMaxSize,
+  IsArray,
   IsDateString,
   IsEnum,
   IsNotEmpty,
@@ -6,7 +9,9 @@ import {
   IsString,
   IsUUID,
   MaxLength,
+  ValidateNested,
 } from 'class-validator';
+import { ConsultationDiagnosisDTO } from './consultation-diagnosis.dto';
 import { Department } from 'common/enums/department.enum';
 import { ConsultationType } from 'src/consultation/enums/consultation-type.enum';
 
@@ -52,9 +57,11 @@ export class CreateConsultationDto {
   diagnosis?: string;
 
   @IsOptional()
-  @IsString()
-  @MaxLength(500)
-  icd10Codes?: string;
+  @IsArray({ message: 'diagnoses must be a list' })
+  @ArrayMaxSize(20, { message: 'A consultation can have at most 20 diagnoses' })
+  @ValidateNested({ each: true })
+  @Type(() => ConsultationDiagnosisDTO)
+  diagnoses?: ConsultationDiagnosisDTO[];
 
   @IsOptional()
   @IsString()

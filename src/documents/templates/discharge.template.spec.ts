@@ -43,4 +43,26 @@ describe('renderDischargeSummary', () => {
     // Assert
     expect(html).not.toContain('Examination and assessment');
   });
+
+  it('lists coded diagnoses with the primary one first', () => {
+    // Arrange
+    const coded = consultation({
+      diagnoses: [
+        { code: 'J06.9', title: 'Acute URTI', isPrimary: false, rank: 0 },
+        { code: 'B54', title: 'Unspecified malaria', isPrimary: true, rank: 1 },
+      ] as Consultation['diagnoses'],
+    });
+
+    // Act
+    const html = renderDischargeSummary({
+      consultation: coded,
+      labOrders: [],
+      prescriptions: [],
+    });
+
+    // Assert
+    expect(html).toContain(
+      'B54 Unspecified malaria (primary)<br />J06.9 Acute URTI',
+    );
+  });
 });

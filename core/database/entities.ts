@@ -1,6 +1,7 @@
 import { AuditLog } from 'src/auditLogs/entities/audit-log.entity';
 import { AuthToken } from 'src/auth/entities/auth-token.entity';
 import { ConsultationAddendum } from 'src/consultation/entities/consultation-addendum.entity';
+import { ConsultationDiagnosis } from 'src/consultation/entities/consultation-diagnosis.entity';
 import { Consultation } from 'src/consultation/entities/consultation.entity';
 import { Contact } from 'src/contacts/entities/contact.entity';
 import { DiagnosisCode } from 'src/diagnoses/entities/diagnosis-code.entity';
@@ -35,6 +36,7 @@ export const entities = [
   QueueEntry,
   Consultation,
   ConsultationAddendum,
+  ConsultationDiagnosis,
   DiagnosisCode,
   OneTimePassword,
   Service,

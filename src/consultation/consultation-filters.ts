@@ -37,7 +37,11 @@ const RANGES: ReadonlyArray<{
 const TEXT_MATCH = `(
   LOWER(consultation.chiefComplaint) LIKE :term OR
   LOWER(COALESCE(consultation.diagnosis, '')) LIKE :term OR
-  LOWER(COALESCE(consultation.icd10Codes, '')) LIKE :term OR
+  EXISTS (
+    SELECT 1 FROM "consultation_diagnoses" coded
+    WHERE coded."consultationId" = consultation.id
+      AND (LOWER(coded.code) LIKE :term OR LOWER(COALESCE(coded.title, '')) LIKE :term)
+  ) OR
   LOWER(patient.mrn) LIKE :term OR
   LOWER(patient.firstName) LIKE :term OR
   LOWER(patient.lastName) LIKE :term

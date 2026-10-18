@@ -62,7 +62,7 @@ export class DocumentsService {
   async renderDischargeSummary(consultationId: string, autoPrint = false): Promise<string> {
     const consultation = await this.consultations.findOne({
       where: { id: consultationId },
-      relations: { patient: true, doctor: true },
+      relations: { patient: true, doctor: true, diagnoses: true },
     });
     if (!consultation) throw new NotFoundException('Consultation not found');
 

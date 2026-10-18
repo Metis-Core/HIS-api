@@ -1,4 +1,11 @@
-import { Column, Entity, Index, JoinColumn, ManyToOne } from 'typeorm';
+import {
+  Column,
+  Entity,
+  Index,
+  JoinColumn,
+  ManyToOne,
+  OneToMany,
+} from 'typeorm';
 import { BaseEntity } from 'common/entities/base.entity';
 import { Department } from 'common/enums/department.enum';
 import { Patient } from 'src/patients/entities/patient.entity';
@@ -7,6 +14,7 @@ import { Visit } from 'src/queue/entities/visit.entity';
 import { Triage } from 'src/traige/entities/traige.entity';
 import { ConsultationStatus } from 'src/consultation/enums/consultation-status.enum';
 import { ConsultationType } from 'src/consultation/enums/consultation-type.enum';
+import { ConsultationDiagnosis } from './consultation-diagnosis.entity';
 
 @Entity('consultations')
 export class Consultation extends BaseEntity {
@@ -78,8 +86,8 @@ export class Consultation extends BaseEntity {
   @Column({ type: 'text', nullable: true })
   diagnosis: string | null;
 
-  @Column({ type: 'varchar', length: 500, nullable: true })
-  icd10Codes: string | null;
+  @OneToMany(() => ConsultationDiagnosis, (d) => d.consultation)
+  diagnoses?: ConsultationDiagnosis[];
 
   @Column({ type: 'text', nullable: true })
   plan: string | null;

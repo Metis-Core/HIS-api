@@ -1,7 +1,6 @@
 import {
   encounterChanges,
   headerChanges,
-  normalizeIcdCodes,
 } from './consultation-encounter.mapper';
 
 describe('consultation encounter mapper', () => {
@@ -29,17 +28,6 @@ describe('consultation encounter mapper', () => {
 
     // Assert
     expect(Object.keys(changes)).toEqual(['diagnosis']);
-  });
-
-  it('normalises ICD codes to upper case without blanks', () => {
-    // Arrange
-    const raw = ' b54, ,j06.9 ';
-
-    // Act
-    const codes = normalizeIcdCodes(raw);
-
-    // Assert
-    expect(codes).toBe('B54,J06.9');
   });
 
   it('clears an emptied follow-up date and keeps unsent header fields out', () => {

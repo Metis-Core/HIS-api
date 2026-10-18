@@ -1,26 +1,20 @@
-import {
-  BadRequestException,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Department } from 'common/enums/department.enum';
 import { BaseCrudService } from 'common/services/crud.service';
-import { PatientsService } from 'src/patients/patients.service';
-import { Visit } from 'src/queue/entities/visit.entity';
-import { UsersService } from 'src/users/users.service';
 import {
   ConsultationActor,
-  assertCanAssignDoctor,
   assertCanEditConsultation,
-  assertIsDoctor,
 } from './consultation-access.policy';
-import { assertOpenForEditing } from './consultation-lock.policy';
+import { ConsultationDiagnosesService } from './consultation-diagnoses.service';
 import {
   encounterChanges,
   headerChanges,
 } from './consultation-encounter.mapper';
+import { assertOpenForEditing } from './consultation-lock.policy';
+import { ConsultationReferencesService } from './consultation-references.service';
+import { ConsultationDiagnosisDTO } from './dto/consultation-diagnosis.dto';
 import { CreateConsultationDto } from './dto/create-consultation.dto';
 import { UpdateConsultationDto } from './dto/update-consultation.dto';
 import { Consultation } from './entities/consultation.entity';
@@ -32,10 +26,8 @@ export class ConsultationService extends BaseCrudService<Consultation> {
   constructor(
     @InjectRepository(Consultation)
     private readonly consultationsRepository: Repository<Consultation>,
-    @InjectRepository(Visit)
-    private readonly visitsRepository: Repository<Visit>,
-    private readonly patientsService: PatientsService,
-    private readonly usersService: UsersService,
+    private readonly references: ConsultationReferencesService,
+    private readonly diagnoses: ConsultationDiagnosesService,
   ) {
     super(consultationsRepository);
   }
@@ -44,16 +36,15 @@ export class ConsultationService extends BaseCrudService<Consultation> {
     dto: CreateConsultationDto,
     actor: ConsultationActor,
   ): Promise<Consultation> {
-    await this.patientsService.findOne(dto.patientId);
+    await this.references.assertPatient(dto.patientId);
     const doctorId = dto.doctorId ?? actor.id;
-    await this.assertAssignableDoctor(doctorId, actor);
+    await this.references.assertAssignableDoctor(doctorId, actor);
     if (dto.visitId) {
-      await this.assertVisitOfPatient(dto.visitId, dto.patientId);
+      await this.references.assertVisitOfPatient(dto.visitId, dto.patientId);
     }
-
-    const now = new Date();
     const consultation = this.consultationsRepository.create({
       ...encounterChanges(dto),
+      ...headerChanges(dto),
       patientId: dto.patientId,
       doctorId,
       visitId: dto.visitId ?? null,
@@ -61,19 +52,24 @@ export class ConsultationService extends BaseCrudService<Consultation> {
       type: dto.type ?? ConsultationType.OUTPATIENT,
       status: ConsultationStatus.IN_PROGRESS,
       department: dto.department ?? Department.OUTPATIENT_CLINIC,
-      chiefComplaint: dto.chiefComplaint.trim(),
-      followUpDate: dto.followUpDate ?? null,
-      startedAt: dto.startedAt ? new Date(dto.startedAt) : now,
+      startedAt: dto.startedAt ? new Date(dto.startedAt) : new Date(),
       completedAt: null,
     });
-    const saved = await this.consultationsRepository.save(consultation);
+    const saved = await this.persist(consultation, dto.diagnoses);
     return this.findOne(saved.id);
   }
 
   override async findOne(id: string): Promise<Consultation> {
     const consultation = await this.consultationsRepository.findOne({
       where: { id },
-      relations: { patient: true, doctor: true, visit: true, triage: true },
+      relations: {
+        patient: true,
+        doctor: true,
+        visit: true,
+        triage: true,
+        diagnoses: true,
+      },
+      order: { diagnoses: { rank: 'ASC' } },
     });
     if (!consultation) throw new NotFoundException('Consultation not found');
     return consultation;
@@ -96,49 +92,44 @@ export class ConsultationService extends BaseCrudService<Consultation> {
   ): Promise<Consultation> {
     const consultation = await this.findEditable(id, actor);
     assertOpenForEditing(consultation);
-    if (
-      dto.patientId !== undefined &&
-      dto.patientId !== consultation.patientId
-    ) {
-      await this.patientsService.findOne(dto.patientId);
+    if (dto.patientId && dto.patientId !== consultation.patientId) {
+      await this.references.assertPatient(dto.patientId);
       consultation.patientId = dto.patientId;
     }
-    if (dto.doctorId !== undefined && dto.doctorId !== consultation.doctorId) {
-      await this.assertAssignableDoctor(dto.doctorId, actor);
+    if (dto.doctorId && dto.doctorId !== consultation.doctorId) {
+      await this.references.assertAssignableDoctor(dto.doctorId, actor);
       consultation.doctorId = dto.doctorId;
     }
-    if (dto.visitId)
-      await this.assertVisitOfPatient(dto.visitId, consultation.patientId);
+    if (dto.visitId) {
+      await this.references.assertVisitOfPatient(
+        dto.visitId,
+        consultation.patientId,
+      );
+    }
     if (dto.visitId !== undefined) consultation.visitId = dto.visitId || null;
-    if (dto.triageId !== undefined)
+    if (dto.triageId !== undefined) {
       consultation.triageId = dto.triageId || null;
+    }
     Object.assign(consultation, encounterChanges(dto), headerChanges(dto), {
       type: dto.type ?? consultation.type,
       department: dto.department ?? consultation.department,
     });
-    await this.consultationsRepository.save(consultation);
+    await this.persist(consultation, dto.diagnoses);
     return this.findOne(id);
   }
 
-  private async assertAssignableDoctor(
-    doctorId: string,
-    actor: ConsultationActor,
-  ): Promise<void> {
-    assertCanAssignDoctor(doctorId, actor);
-    assertIsDoctor(await this.usersService.findOne(doctorId));
-  }
-
-  private async assertVisitOfPatient(
-    visitId: string,
-    patientId: string,
-  ): Promise<void> {
-    const visit = await this.visitsRepository.findOne({
-      where: { id: visitId },
-      select: { id: true, patientId: true },
+  // Codes are checked before anything is written, then the encounter and its diagnoses save together.
+  private async persist(
+    consultation: Consultation,
+    diagnoses?: ConsultationDiagnosisDTO[],
+  ): Promise<Consultation> {
+    const rows = diagnoses ? await this.diagnoses.resolve(diagnoses) : null;
+    return this.consultationsRepository.manager.transaction(async (manager) => {
+      // Diagnoses are replaced below; a stale loaded list must not be diffed by the save.
+      consultation.diagnoses = undefined;
+      const saved = await manager.save(consultation);
+      if (rows) await this.diagnoses.replace(manager, saved.id, rows);
+      return saved;
     });
-    if (!visit) throw new NotFoundException('Visit not found');
-    if (visit.patientId !== patientId) {
-      throw new BadRequestException('Visit does not belong to this patient');
-    }
   }
 }

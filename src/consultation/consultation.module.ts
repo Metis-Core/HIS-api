@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { DiagnosesModule } from 'src/diagnoses/diagnoses.module';
 import { LabModule } from 'src/lab/lab.module';
 import { PatientsModule } from 'src/patients/patients.module';
 import { PharmacyModule } from 'src/pharmacy/pharmacy.module';
@@ -10,15 +11,23 @@ import { ConsultationAddendaService } from './consultation-addenda.service';
 import { ConsultationLifecycleService } from './consultation-lifecycle.service';
 import { ConsultationOrdersController } from './consultation-orders.controller';
 import { ConsultationOrdersService } from './consultation-orders.service';
+import { ConsultationDiagnosesService } from './consultation-diagnoses.service';
+import { ConsultationReferencesService } from './consultation-references.service';
 import { ConsultationQueryService } from './consultation-query.service';
 import { ConsultationController } from './consultation.controller';
 import { ConsultationService } from './consultation.service';
 import { ConsultationAddendum } from './entities/consultation-addendum.entity';
+import { ConsultationDiagnosis } from './entities/consultation-diagnosis.entity';
 import { Consultation } from './entities/consultation.entity';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Consultation, ConsultationAddendum]),
+    TypeOrmModule.forFeature([
+      Consultation,
+      ConsultationAddendum,
+      ConsultationDiagnosis,
+    ]),
+    DiagnosesModule,
     PatientsModule,
     UsersModule,
     QueueModule,
@@ -36,6 +45,8 @@ import { Consultation } from './entities/consultation.entity';
     ConsultationLifecycleService,
     ConsultationAddendaService,
     ConsultationOrdersService,
+    ConsultationReferencesService,
+    ConsultationDiagnosesService,
   ],
   exports: [ConsultationService, TypeOrmModule],
 })

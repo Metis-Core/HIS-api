@@ -2,11 +2,23 @@ import 'reflect-metadata';
 import { Logger } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { DiagnosisCode } from 'src/diagnoses/entities/diagnosis-code.entity';
-import { readBundledCatalogue } from '../seeds/icd-catalogue';
+import {
+  BUNDLED_CATALOGUE,
+  readBundledCatalogue,
+} from '../seeds/icd-catalogue';
 import { buildDataSourceOptions } from '../typeorm.options';
 
 const BATCH_SIZE = 1000;
 const logger = new Logger('SeedDiagnosisCodes');
+
+// Codes moved over from the old free-text field get their catalogue entry and official title.
+async function linkCarriedOverCodes(dataSource: DataSource): Promise<number> {
+  const result = await dataSource.query<[unknown, number]>(
+    `UPDATE "consultation_diagnoses" cd SET "diagnosisCodeId" = dc."id", "system" = dc."system", "title" = dc."title" FROM "diagnosis_codes" dc WHERE cd."diagnosisCodeId" IS NULL AND dc."system" = $1 AND dc."code" = cd."code" AND NOT EXISTS (SELECT 1 FROM "consultation_diagnoses" other WHERE other."consultationId" = cd."consultationId" AND other."system" = dc."system" AND other."code" = dc."code")`,
+    [BUNDLED_CATALOGUE.system],
+  );
+  return result[1];
+}
 
 // Idempotent: re-running updates titles in place and never duplicates a code.
 async function seed(): Promise<void> {
@@ -25,6 +37,9 @@ async function seed(): Promise<void> {
         .execute();
     }
     logger.log(`Loaded ${rows.length} diagnosis codes`);
+    logger.log(
+      `Linked ${await linkCarriedOverCodes(dataSource)} carried-over diagnoses`,
+    );
   } finally {
     await dataSource.destroy();
   }

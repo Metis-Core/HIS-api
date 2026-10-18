@@ -1,25 +1,42 @@
 import {
   BadRequestException,
+  ConflictException,
   ForbiddenException,
   NotFoundException,
 } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { UserRole } from 'common/enums/userRoles.enum';
-import { PatientsService } from 'src/patients/patients.service';
-import { Visit } from 'src/queue/entities/visit.entity';
-import { UsersService } from 'src/users/users.service';
+import { ConsultationDiagnosesService } from './consultation-diagnoses.service';
+import { ConsultationReferencesService } from './consultation-references.service';
 import { ConsultationService } from './consultation.service';
 import { Consultation } from './entities/consultation.entity';
+import { ConsultationStatus } from './enums/consultation-status.enum';
 
+const manager = {
+  save: jest.fn((value: Consultation) => ({ ...value, id: 'c1' })),
+};
 const consultationsRepo = {
   create: jest.fn((value: Partial<Consultation>) => value),
-  save: jest.fn((value: Partial<Consultation>) => ({ ...value, id: 'c1' })),
   findOne: jest.fn(),
+  manager: {
+    transaction: jest.fn((work: (m: typeof manager) => unknown) =>
+      work(manager),
+    ),
+  },
 };
-const visitsRepo = { findOne: jest.fn() };
-const users = { findOne: jest.fn() };
+const references = {
+  assertPatient: jest.fn(),
+  assertAssignableDoctor: jest.fn(),
+  assertVisitOfPatient: jest.fn(),
+};
+const diagnoses = { resolve: jest.fn(), replace: jest.fn() };
 const doctor = { id: 'd1', role: UserRole.DOCTOR };
+const open = {
+  id: 'c1',
+  doctorId: 'd1',
+  status: ConsultationStatus.IN_PROGRESS,
+};
 
 describe('ConsultationService', () => {
   let service: ConsultationService;
@@ -33,18 +50,18 @@ describe('ConsultationService', () => {
           provide: getRepositoryToken(Consultation),
           useValue: consultationsRepo,
         },
-        { provide: getRepositoryToken(Visit), useValue: visitsRepo },
-        { provide: PatientsService, useValue: { findOne: jest.fn() } },
-        { provide: UsersService, useValue: users },
+        { provide: ConsultationReferencesService, useValue: references },
+        { provide: ConsultationDiagnosesService, useValue: diagnoses },
       ],
     }).compile();
     service = module.get(ConsultationService);
   });
 
-  it('refuses a visit that belongs to another patient', async () => {
+  it('stops before saving when the visit belongs to another patient', async () => {
     // Arrange
-    users.findOne.mockResolvedValue(doctor);
-    visitsRepo.findOne.mockResolvedValue({ id: 'v1', patientId: 'other' });
+    references.assertVisitOfPatient.mockRejectedValue(
+      new BadRequestException(),
+    );
 
     // Act
     const act = service.open(
@@ -54,35 +71,79 @@ describe('ConsultationService', () => {
 
     // Assert
     await expect(act).rejects.toBeInstanceOf(BadRequestException);
-    expect(consultationsRepo.save).not.toHaveBeenCalled();
+    expect(manager.save).not.toHaveBeenCalled();
   });
 
-  it('refuses to assign a consultation to a non-doctor', async () => {
+  it('opens a consultation for the signed-in doctor with its diagnoses', async () => {
     // Arrange
-    users.findOne.mockResolvedValue({ id: 'r1', role: UserRole.RECEPTIONIST });
-    const admin = { id: 'a1', role: UserRole.ADMIN };
+    const rows = [{ code: 'B54', isPrimary: true, rank: 0 }];
+    diagnoses.resolve.mockResolvedValue(rows);
+    consultationsRepo.findOne.mockResolvedValue(open);
 
     // Act
-    const act = service.open(
-      { patientId: 'p1', doctorId: 'r1', chiefComplaint: 'Fever' },
-      admin,
+    await service.open(
+      {
+        patientId: 'p1',
+        chiefComplaint: ' Fever ',
+        diagnoses: [{ codeId: 'code-1' }],
+      },
+      doctor,
     );
 
     // Assert
-    await expect(act).rejects.toBeInstanceOf(BadRequestException);
-    expect(consultationsRepo.save).not.toHaveBeenCalled();
+    expect(references.assertAssignableDoctor).toHaveBeenCalledWith(
+      'd1',
+      doctor,
+    );
+    expect(manager.save).toHaveBeenCalledWith(
+      expect.objectContaining({
+        doctorId: 'd1',
+        chiefComplaint: 'Fever',
+        status: ConsultationStatus.IN_PROGRESS,
+      }),
+    );
+    expect(diagnoses.replace).toHaveBeenCalledWith(manager, 'c1', rows);
+  });
+
+  it('leaves diagnoses alone when an edit does not send them', async () => {
+    // Arrange
+    consultationsRepo.findOne.mockResolvedValue({ ...open });
+
+    // Act
+    await service.edit('c1', { plan: 'Rest' }, doctor);
+
+    // Assert
+    expect(diagnoses.resolve).not.toHaveBeenCalled();
+    expect(diagnoses.replace).not.toHaveBeenCalled();
+    expect(manager.save).toHaveBeenCalledWith(
+      expect.objectContaining({ plan: 'Rest' }),
+    );
   });
 
   it('stops a doctor editing a colleague’s consultation', async () => {
     // Arrange
-    consultationsRepo.findOne.mockResolvedValue({ id: 'c1', doctorId: 'd2' });
+    consultationsRepo.findOne.mockResolvedValue({ ...open, doctorId: 'd2' });
 
     // Act
     const act = service.edit('c1', { plan: 'Rest' }, doctor);
 
     // Assert
     await expect(act).rejects.toBeInstanceOf(ForbiddenException);
-    expect(consultationsRepo.save).not.toHaveBeenCalled();
+    expect(manager.save).not.toHaveBeenCalled();
+  });
+
+  it('refuses to edit a signed consultation', async () => {
+    // Arrange
+    consultationsRepo.findOne.mockResolvedValue({
+      ...open,
+      status: ConsultationStatus.COMPLETED,
+    });
+
+    // Act
+    const act = service.edit('c1', { plan: 'Rest' }, doctor);
+
+    // Assert
+    await expect(act).rejects.toBeInstanceOf(ConflictException);
   });
 
   it('reports a missing consultation as not found', async () => {
