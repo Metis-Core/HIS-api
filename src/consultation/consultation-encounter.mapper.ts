@@ -15,6 +15,9 @@ type EncounterTextField = (typeof ENCOUNTER_TEXT_FIELDS)[number];
 type EncounterInput = Partial<
   Pick<CreateConsultationDto, EncounterTextField | 'icd10Codes'>
 >;
+type HeaderInput = Partial<
+  Pick<CreateConsultationDto, 'chiefComplaint' | 'followUpDate' | 'startedAt'>
+>;
 
 const cleanText = (value?: string | null): string | null =>
   value?.trim() || null;
@@ -44,4 +47,23 @@ export function encounterChanges(
     changes.icd10Codes = normalizeIcdCodes(input.icd10Codes);
   }
   return changes;
+}
+
+/** Chief complaint, follow-up and start time present in the input. */
+export function headerChanges(
+  input: HeaderInput,
+): Partial<
+  Pick<Consultation, 'chiefComplaint' | 'followUpDate' | 'startedAt'>
+> {
+  return {
+    ...(input.chiefComplaint !== undefined && {
+      chiefComplaint: input.chiefComplaint.trim(),
+    }),
+    ...(input.followUpDate !== undefined && {
+      followUpDate: input.followUpDate || null,
+    }),
+    ...(input.startedAt !== undefined && {
+      startedAt: new Date(input.startedAt),
+    }),
+  };
 }

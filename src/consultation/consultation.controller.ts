@@ -40,7 +40,7 @@ export class ConsultationController {
     @Body() dto: CreateConsultationDto,
     @CurrentUser() user: AuthenticatedUser,
   ) {
-    return this.consultationService.create(dto, user.id);
+    return this.consultationService.open(dto, user);
   }
 
   @Get()
@@ -75,8 +75,9 @@ export class ConsultationController {
   update(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: UpdateConsultationDto,
+    @CurrentUser() user: AuthenticatedUser,
   ) {
-    return this.consultationService.update(id, dto);
+    return this.consultationService.edit(id, dto, user);
   }
 
   @Put(':id')
@@ -84,8 +85,9 @@ export class ConsultationController {
   replace(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: UpdateConsultationDto,
+    @CurrentUser() user: AuthenticatedUser,
   ) {
-    return this.consultationService.update(id, dto);
+    return this.consultationService.edit(id, dto, user);
   }
 
   @Post(':id/complete')
@@ -95,21 +97,25 @@ export class ConsultationController {
     @Body() dto: CompleteConsultationDto,
     @CurrentUser() user: AuthenticatedUser,
   ) {
-    return this.lifecycle.complete(id, dto, user.role);
+    return this.lifecycle.complete(id, dto, user);
   }
 
   @Post(':id/cancel')
   @Roles(RoleGroups.PROVIDERS)
   cancel(
     @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() user: AuthenticatedUser,
     @Body('reason') reason?: string,
   ) {
-    return this.lifecycle.cancel(id, reason);
+    return this.lifecycle.cancel(id, user, reason);
   }
 
   @Delete(':id')
   @Roles(RoleGroups.ADMINS)
-  remove(@Param('id', ParseUUIDPipe) id: string) {
-    return this.lifecycle.cancel(id);
+  remove(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.lifecycle.cancel(id, user);
   }
 }

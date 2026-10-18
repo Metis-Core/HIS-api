@@ -1,5 +1,6 @@
 import {
   encounterChanges,
+  headerChanges,
   normalizeIcdCodes,
 } from './consultation-encounter.mapper';
 
@@ -39,5 +40,16 @@ describe('consultation encounter mapper', () => {
 
     // Assert
     expect(codes).toBe('B54,J06.9');
+  });
+
+  it('clears an emptied follow-up date and keeps unsent header fields out', () => {
+    // Arrange
+    const input = { followUpDate: '' };
+
+    // Act
+    const changes = headerChanges(input);
+
+    // Assert
+    expect(changes).toEqual({ followUpDate: null });
   });
 });

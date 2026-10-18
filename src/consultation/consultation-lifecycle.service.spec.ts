@@ -22,7 +22,7 @@ describe('ConsultationLifecycleService', () => {
     const dto = { nextIntents: [VisitIntenentsEnum.LAB] };
 
     // Act
-    const act = service.complete('c1', dto, UserRole.NURSE);
+    const act = service.complete('c1', dto, { id: 'n1', role: UserRole.NURSE });
 
     // Assert
     await expect(act).rejects.toBeInstanceOf(ForbiddenException);

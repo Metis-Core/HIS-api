@@ -44,7 +44,7 @@ export class ConsultationOrdersController {
     },
     @CurrentUser() user: AuthenticatedUser,
   ) {
-    const consultation = await this.consultationService.findOne(id);
+    const consultation = await this.consultationService.findEditable(id, user);
     return this.labOrdersService.createOrder(
       {
         ...dto,
@@ -67,7 +67,7 @@ export class ConsultationOrdersController {
     },
     @CurrentUser() user: AuthenticatedUser,
   ) {
-    const consultation = await this.consultationService.findOne(id);
+    const consultation = await this.consultationService.findEditable(id, user);
     return this.pharmacyService.createPrescription(
       {
         ...dto,

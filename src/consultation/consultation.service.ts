@@ -10,7 +10,16 @@ import { BaseCrudService } from 'common/services/crud.service';
 import { PatientsService } from 'src/patients/patients.service';
 import { Visit } from 'src/queue/entities/visit.entity';
 import { UsersService } from 'src/users/users.service';
-import { encounterChanges } from './consultation-encounter.mapper';
+import {
+  ConsultationActor,
+  assertCanAssignDoctor,
+  assertCanEditConsultation,
+  assertIsDoctor,
+} from './consultation-access.policy';
+import {
+  encounterChanges,
+  headerChanges,
+} from './consultation-encounter.mapper';
 import { CreateConsultationDto } from './dto/create-consultation.dto';
 import { UpdateConsultationDto } from './dto/update-consultation.dto';
 import { Consultation } from './entities/consultation.entity';
@@ -30,16 +39,16 @@ export class ConsultationService extends BaseCrudService<Consultation> {
     super(consultationsRepository);
   }
 
-  override async create(
+  async open(
     dto: CreateConsultationDto,
-    currentUserId?: string,
+    actor: ConsultationActor,
   ): Promise<Consultation> {
     await this.patientsService.findOne(dto.patientId);
-    const doctorId = dto.doctorId ?? currentUserId;
-    if (!doctorId) throw new BadRequestException('Doctor is required');
-    await this.usersService.findOne(doctorId);
-    if (dto.visitId)
+    const doctorId = dto.doctorId ?? actor.id;
+    await this.assertAssignableDoctor(doctorId, actor);
+    if (dto.visitId) {
       await this.assertVisitOfPatient(dto.visitId, dto.patientId);
+    }
 
     const now = new Date();
     const consultation = this.consultationsRepository.create({
@@ -69,11 +78,22 @@ export class ConsultationService extends BaseCrudService<Consultation> {
     return consultation;
   }
 
-  override async update(
+  /** Loads a consultation the actor may change (M-11). */
+  async findEditable(
     id: string,
-    dto: UpdateConsultationDto,
+    actor: ConsultationActor,
   ): Promise<Consultation> {
     const consultation = await this.findOne(id);
+    assertCanEditConsultation(consultation, actor);
+    return consultation;
+  }
+
+  async edit(
+    id: string,
+    dto: UpdateConsultationDto,
+    actor: ConsultationActor,
+  ): Promise<Consultation> {
+    const consultation = await this.findEditable(id, actor);
     if (consultation.status === ConsultationStatus.CANCELLED) {
       throw new BadRequestException('Cancelled consultation cannot be edited');
     }
@@ -84,8 +104,8 @@ export class ConsultationService extends BaseCrudService<Consultation> {
       await this.patientsService.findOne(dto.patientId);
       consultation.patientId = dto.patientId;
     }
-    if (dto.doctorId !== undefined) {
-      await this.usersService.findOne(dto.doctorId);
+    if (dto.doctorId !== undefined && dto.doctorId !== consultation.doctorId) {
+      await this.assertAssignableDoctor(dto.doctorId, actor);
       consultation.doctorId = dto.doctorId;
     }
     if (dto.visitId)
@@ -99,19 +119,21 @@ export class ConsultationService extends BaseCrudService<Consultation> {
     ) {
       consultation.completedAt = new Date();
     }
-    if (dto.chiefComplaint !== undefined)
-      consultation.chiefComplaint = dto.chiefComplaint.trim();
-    if (dto.followUpDate !== undefined)
-      consultation.followUpDate = dto.followUpDate || null;
-    if (dto.startedAt !== undefined)
-      consultation.startedAt = new Date(dto.startedAt);
-    Object.assign(consultation, encounterChanges(dto), {
+    Object.assign(consultation, encounterChanges(dto), headerChanges(dto), {
       type: dto.type ?? consultation.type,
       department: dto.department ?? consultation.department,
       status: dto.status ?? consultation.status,
     });
     await this.consultationsRepository.save(consultation);
     return this.findOne(id);
+  }
+
+  private async assertAssignableDoctor(
+    doctorId: string,
+    actor: ConsultationActor,
+  ): Promise<void> {
+    assertCanAssignDoctor(doctorId, actor);
+    assertIsDoctor(await this.usersService.findOne(doctorId));
   }
 
   private async assertVisitOfPatient(
