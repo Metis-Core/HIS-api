@@ -6,6 +6,8 @@ import { QueueEntry } from './entities/queue-entry.entity';
 import { Visit } from './entities/visit.entity';
 import { QueueEntriesService } from './queue-entries.service';
 import { QueueGateway } from './queue.gateway';
+import { LabOnlyVisitController } from './lab-only-visit.controller';
+import { LabOnlyVisitsService } from './lab-only-visits.service';
 import { VisitController } from './visit.controller';
 import { VisitsService } from './visit.service';
 
@@ -15,8 +17,18 @@ import { VisitsService } from './visit.service';
     PatientsModule,
     UsersModule,
   ],
-  controllers: [VisitController],
-  providers: [QueueGateway, VisitsService, QueueEntriesService],
-  exports: [VisitsService, QueueEntriesService, TypeOrmModule],
+  controllers: [VisitController, LabOnlyVisitController],
+  providers: [
+    QueueGateway,
+    VisitsService,
+    QueueEntriesService,
+    LabOnlyVisitsService,
+  ],
+  exports: [
+    VisitsService,
+    QueueEntriesService,
+    LabOnlyVisitsService,
+    TypeOrmModule,
+  ],
 })
-export class QueueModule { }
+export class QueueModule {}

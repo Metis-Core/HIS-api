@@ -32,5 +32,6 @@ describe('patient scope policy', () => {
     // Assert
     expect(all).toBeNull();
     expect(lab).toContain('"lab_orders"');
+    expect(lab).toContain("'main_laboratory'");
   });
 });

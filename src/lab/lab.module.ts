@@ -9,6 +9,7 @@ import { LabOrder } from './entities/lab-order.entity';
 import { LabResultAmendment } from './entities/lab-result-amendment.entity';
 import { LabTest } from './entities/lab-test.entity';
 import { LabController } from './lab.controller';
+import { LabOrderIntakeService } from './lab-order-intake.service';
 import { LabOrdersService } from './lab-orders.service';
 import { LabAmendmentsService } from './lab-amendments.service';
 import { LabOrderProgressService } from './lab-order-progress.service';
@@ -33,10 +34,11 @@ import { LabTestsService } from './lab-tests.service';
   providers: [
     LabTestsService,
     LabOrdersService,
+    LabOrderIntakeService,
     LabResultsService,
     LabOrderProgressService,
     LabAmendmentsService,
   ],
-  exports: [LabTestsService, LabOrdersService],
+  exports: [LabTestsService, LabOrdersService, LabOrderIntakeService],
 })
 export class LabModule {}

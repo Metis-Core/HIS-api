@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
 import { LabOrderCreatedEvent } from 'src/lab/events/lab-order-created.event';
 import { VisitCheckedInEvent } from 'src/queue/events/visit-checked-in.event';
+import { VisitIntenentsEnum } from 'src/queue/enums/visit-type.enum';
 import { PaymentsService } from '../payments.service';
 
 @Injectable()
@@ -12,13 +13,22 @@ export class BillingListener {
 
   @OnEvent(VisitCheckedInEvent.channel, { async: true })
   async onVisitCheckedIn(event: VisitCheckedInEvent) {
+    if (!event.intents.includes(VisitIntenentsEnum.CONSULTATION)) return;
     try {
-      const charge = await this.payments.addConsultationFee(event.visitId, event.checkedInById);
+      const charge = await this.payments.addConsultationFee(
+        event.visitId,
+        event.checkedInById,
+      );
       if (!charge) {
-        this.logger.warn(`No active "Consultation" service priced; visit ${event.visitId} has no consultation fee`);
+        this.logger.warn(
+          `No active "Consultation" service priced; visit ${event.visitId} has no consultation fee`,
+        );
       }
     } catch (error) {
-      this.logger.error(`Failed to bill consultation for visit ${event.visitId}`, error as Error);
+      this.logger.error(
+        `Failed to bill consultation for visit ${event.visitId}`,
+        error as Error,
+      );
     }
   }
 
@@ -26,9 +36,16 @@ export class BillingListener {
   async onLabOrderCreated(event: LabOrderCreatedEvent) {
     if (!event.visitId) return;
     try {
-      await this.payments.addLabCharges(event.visitId, event.items, event.orderedById);
+      await this.payments.addLabCharges(
+        event.visitId,
+        event.items,
+        event.orderedById,
+      );
     } catch (error) {
-      this.logger.error(`Failed to bill lab order ${event.orderId}`, error as Error);
+      this.logger.error(
+        `Failed to bill lab order ${event.orderId}`,
+        error as Error,
+      );
     }
   }
 }

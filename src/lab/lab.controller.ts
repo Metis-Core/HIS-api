@@ -22,7 +22,9 @@ import { QueryLabOrdersDto } from './dto/query-lab-orders.dto';
 import { QueryLabTestsDto } from './dto/query-lab-tests.dto';
 import { UpdateLabOrderDto } from './dto/update-lab-order.dto';
 import { UpdateLabTestDto } from './dto/update-lab-test.dto';
+import { LabOrderIntakeService } from './lab-order-intake.service';
 import { LabOrdersService } from './lab-orders.service';
+import { CancelLabOrderDto } from './dto/cancel-lab-order.dto';
 import { LabTestsService } from './lab-tests.service';
 import { PaginationQueryDTO } from 'common/pagination';
 
@@ -31,6 +33,7 @@ export class LabController {
   constructor(
     private readonly labTestsService: LabTestsService,
     private readonly labOrdersService: LabOrdersService,
+    private readonly labOrderIntake: LabOrderIntakeService,
   ) {}
 
   @Post('tests')
@@ -66,13 +69,13 @@ export class LabController {
   }
 
   @Post('orders')
-  @Roles(RoleGroups.PROVIDERS)
+  @Roles(RoleGroups.LAB_ORDERERS)
   @HttpCode(HttpStatus.CREATED)
   createOrder(
     @Body() dto: CreateLabOrderDto,
     @CurrentUser() user: AuthenticatedUser,
   ) {
-    return this.labOrdersService.createOrder(dto, user.id);
+    return this.labOrderIntake.createOrder(dto, user.id);
   }
 
   @Get('orders')
@@ -134,8 +137,9 @@ export class LabController {
   @Roles(UserRole.DOCTOR, UserRole.ADMIN, UserRole.SUPER_ADMIN)
   cancelOrder(
     @Param('id', ParseUUIDPipe) id: string,
-    @Body('reason') reason?: string,
+    @Body() dto: CancelLabOrderDto,
+    @CurrentUser() user: AuthenticatedUser,
   ) {
-    return this.labOrdersService.cancelOrder(id, reason);
+    return this.labOrdersService.cancelOrder(id, dto.reason, user.id);
   }
 }

@@ -37,6 +37,13 @@ export class CreateLabOrderDto {
   @MaxLength(500)
   clinicalNotes?: string;
 
+  @IsOptional()
+  @IsString({ message: 'referringClinician must be text' })
+  @MaxLength(150, {
+    message: 'referringClinician must be at most 150 characters',
+  })
+  referringClinician?: string;
+
   @IsArray()
   @ArrayMinSize(1)
   @ValidateNested({ each: true })
