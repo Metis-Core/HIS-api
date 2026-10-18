@@ -1,13 +1,18 @@
 import { Column, Entity, Index, JoinColumn, ManyToOne } from 'typeorm';
 import { BaseEntity } from 'common/entities/base.entity';
 import { Consultation } from 'src/consultation/entities/consultation.entity';
+import type {
+  LabResultData,
+  LabResultFlags,
+} from 'src/lab/results/result-schema.types';
 import { Patient } from 'src/patients/entities/patient.entity';
 import { Visit } from 'src/queue/entities/visit.entity';
-import { Service } from 'src/services/entities/service.entity';
 import { User } from 'src/users/entities/user.entity';
 import { OrderKind } from '../enums/order-kind.enum';
 import { OrderPriority } from '../enums/order-priority.enum';
 import { OrderStatus } from '../enums/order-status.enum';
+import { ResultClassification } from '../enums/result-classification.enum';
+import { ProcedureTest } from './procedure-test.entity';
 
 @Entity('procedure_orders')
 export class ProcedureOrder extends BaseEntity {
@@ -48,12 +53,12 @@ export class ProcedureOrder extends BaseEntity {
   @Column({ type: 'varchar', length: 200 })
   name: string;
 
-  @Column({ type: 'uuid', nullable: true })
-  serviceId: string | null;
+  @Column({ type: 'uuid' })
+  testId: string;
 
-  @ManyToOne(() => Service, { nullable: true, onDelete: 'SET NULL' })
-  @JoinColumn({ name: 'serviceId' })
-  service: Service | null;
+  @ManyToOne(() => ProcedureTest, { onDelete: 'RESTRICT' })
+  @JoinColumn({ name: 'testId' })
+  test: ProcedureTest;
 
   @Column({ type: 'enum', enum: OrderPriority, default: OrderPriority.ROUTINE })
   priority: OrderPriority;
@@ -67,6 +72,18 @@ export class ProcedureOrder extends BaseEntity {
 
   @Column({ type: 'timestamptz', nullable: true })
   scheduledFor: Date | null;
+
+  @Column({ type: 'jsonb', nullable: true })
+  resultData: LabResultData | null;
+
+  @Column({ type: 'jsonb', nullable: true })
+  resultFlags: LabResultFlags | null;
+
+  @Column({ type: 'enum', enum: ResultClassification, nullable: true })
+  classification: ResultClassification | null;
+
+  @Column({ type: 'text', nullable: true })
+  impression: string | null;
 
   @Column({ type: 'text', nullable: true })
   report: string | null;

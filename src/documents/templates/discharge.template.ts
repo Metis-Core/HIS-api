@@ -18,10 +18,16 @@ interface DischargeContext {
   prescriptions: Prescription[];
 }
 
-export function renderDischargeSummary({ consultation, labOrders, prescriptions }: DischargeContext): string {
+export function renderDischargeSummary({
+  consultation,
+  labOrders,
+  prescriptions,
+}: DischargeContext): string {
   const patient = consultation.patient;
   const patientName = patient
-    ? [patient.firstName, patient.middleName, patient.lastName].filter(Boolean).join(' ')
+    ? [patient.firstName, patient.middleName, patient.lastName]
+        .filter(Boolean)
+        .join(' ')
     : 'Patient';
   const doctor = consultation.doctor?.username ?? '—';
 
@@ -65,7 +71,7 @@ export function renderDischargeSummary({ consultation, labOrders, prescriptions 
       <mj-body background-color="#FFFFFF">
         ${documentHeader('Discharge Summary')}
 
-        <mj-section padding="18px 24px">
+        <mj-section padding="18px 32px">
           <mj-column>
             <mj-table>
               <tr class="row">
@@ -84,7 +90,7 @@ export function renderDischargeSummary({ consultation, labOrders, prescriptions 
           </mj-column>
         </mj-section>
 
-        <mj-section padding="0 24px">
+        <mj-section padding="0 32px">
           <mj-column>
             ${clinicalSections(consultation)}
           </mj-column>
@@ -92,9 +98,9 @@ export function renderDischargeSummary({ consultation, labOrders, prescriptions 
 
         ${
           labRows
-            ? `<mj-section padding="0 24px">
+            ? `<mj-section padding="0 32px">
                 <mj-column>
-                  <mj-text font-size="12px" font-weight="700" color="#0E6B5C">Laboratory</mj-text>
+                  <mj-text font-size="12px" font-weight="700" color="#111827">Laboratory</mj-text>
                   <mj-table>
                     <tr><th>Code</th><th>Test</th><th>Result</th><th>Reported</th></tr>
                     ${labRows}
@@ -106,9 +112,9 @@ export function renderDischargeSummary({ consultation, labOrders, prescriptions 
 
         ${
           rxRows
-            ? `<mj-section padding="0 24px">
+            ? `<mj-section padding="0 32px">
                 <mj-column>
-                  <mj-text font-size="12px" font-weight="700" color="#0E6B5C">Prescriptions</mj-text>
+                  <mj-text font-size="12px" font-weight="700" color="#111827">Prescriptions</mj-text>
                   <mj-table>
                     <tr><th>Medication</th><th>Dose</th><th>Freq</th><th>Duration</th><th>Qty</th></tr>
                     ${rxRows}

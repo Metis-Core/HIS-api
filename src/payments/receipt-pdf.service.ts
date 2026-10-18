@@ -9,10 +9,9 @@ import { ChargeStatus } from './enums/charge.enum';
 const MARGIN = 48;
 const PAGE_BOTTOM = 760;
 const INK = '#111827';
-const MUTED = '#5B6572';
-const LINE = '#E3E8E6';
-const BRAND = '#0E6B5C';
-const CRITICAL = '#D0342C';
+const MUTED = '#6B7280';
+const LINE = '#E5E7EB';
+const CRITICAL = '#B42318';
 
 const money = (value: number): string => `UGX ${value.toLocaleString('en-US')}`;
 
@@ -40,25 +39,73 @@ function render(build: (doc: PDFKit.PDFDocument) => void): Promise<Buffer> {
   });
 }
 
-function heading(doc: PDFKit.PDFDocument, title: string): void {
-  doc.fillColor(BRAND).font('Helvetica-Bold').fontSize(18).text(FACILITY_NAME);
-  doc.fillColor(MUTED).font('Helvetica').fontSize(11).text(title);
-  doc.moveDown(0.8);
-}
-
-function field(doc: PDFKit.PDFDocument, name: string, value: string): void {
+function heading(
+  doc: PDFKit.PDFDocument,
+  title: string,
+  reference: string,
+): void {
+  const width = doc.page.width - MARGIN * 2;
+  const top = doc.y;
+  doc
+    .fillColor(INK)
+    .font('Helvetica-Bold')
+    .fontSize(14)
+    .text(FACILITY_NAME, MARGIN, top, { width: width / 2 });
+  doc
+    .font('Helvetica-Bold')
+    .fontSize(14)
+    .text(title, MARGIN + width / 2, top, { width: width / 2, align: 'right' });
   doc
     .fillColor(MUTED)
     .font('Helvetica')
     .fontSize(9)
-    .text(name.toUpperCase(), { continued: true });
-  doc.fillColor(INK).font('Helvetica-Bold').fontSize(10).text(`   ${value}`);
+    .text(reference, MARGIN + width / 2, doc.y, {
+      width: width / 2,
+      align: 'right',
+    });
+  doc.moveDown(0.6);
+  doc
+    .moveTo(MARGIN, doc.y)
+    .lineTo(doc.page.width - MARGIN, doc.y)
+    .lineWidth(1)
+    .strokeColor(INK)
+    .stroke();
+  doc.moveDown(0.8);
+}
+
+function section(doc: PDFKit.PDFDocument, title: string): void {
+  if (doc.y > PAGE_BOTTOM - 60) doc.addPage();
+  doc
+    .moveDown(0.6)
+    .fillColor(MUTED)
+    .font('Helvetica-Bold')
+    .fontSize(8)
+    .text(title.toUpperCase(), MARGIN, doc.y, { characterSpacing: 0.8 });
+  doc.moveDown(0.3);
+}
+
+function field(doc: PDFKit.PDFDocument, name: string, value: string): void {
+  const y = doc.y;
+  doc
+    .fillColor(MUTED)
+    .font('Helvetica')
+    .fontSize(9)
+    .text(name, MARGIN, y + 1, {
+      width: 90,
+    });
+  doc
+    .fillColor(INK)
+    .font('Helvetica')
+    .fontSize(10)
+    .text(value, MARGIN + 90, y, { width: doc.page.width - MARGIN * 2 - 90 });
+  doc.moveDown(0.2);
 }
 
 function rule(doc: PDFKit.PDFDocument): void {
   doc
     .moveTo(MARGIN, doc.y)
     .lineTo(doc.page.width - MARGIN, doc.y)
+    .lineWidth(0.5)
     .strokeColor(LINE)
     .stroke();
   doc.moveDown(0.5);
@@ -93,12 +140,7 @@ function row(
 function lines(doc: PDFKit.PDFDocument, details: InvoiceDetails): void {
   details.groups.forEach((group) => {
     if (doc.y > PAGE_BOTTOM - 60) doc.addPage();
-    doc
-      .moveDown(0.4)
-      .fillColor(BRAND)
-      .font('Helvetica-Bold')
-      .fontSize(10)
-      .text(group.label, MARGIN);
+    section(doc, group.label);
     group.items.forEach((item) => {
       const waived = item.status === ChargeStatus.WAIVED;
       row(
@@ -142,18 +184,13 @@ function patientBlock(doc: PDFKit.PDFDocument, details: InvoiceDetails): void {
 export class ReceiptPdfService {
   invoice(details: InvoiceDetails): Promise<Buffer> {
     return render((doc) => {
-      heading(doc, 'Invoice');
+      heading(doc, 'Invoice', details.invoice.number);
       field(doc, 'Issued', stamp(details.invoice.createdAt));
       patientBlock(doc, details);
       lines(doc, details);
       totals(doc, details);
       if (details.payments.length > 0) {
-        doc
-          .moveDown(0.6)
-          .fillColor(BRAND)
-          .font('Helvetica-Bold')
-          .fontSize(10)
-          .text('Payments', MARGIN);
+        section(doc, 'Payments');
         details.payments.forEach((payment) =>
           row(
             doc,
@@ -168,7 +205,7 @@ export class ReceiptPdfService {
 
   receipt(payment: Payment, details: InvoiceDetails): Promise<Buffer> {
     return render((doc) => {
-      heading(doc, 'Payment receipt');
+      heading(doc, 'Payment receipt', payment.receiptNumber);
       field(doc, 'Receipt', payment.receiptNumber);
       field(doc, 'Received', stamp(payment.receivedAt));
       patientBlock(doc, details);

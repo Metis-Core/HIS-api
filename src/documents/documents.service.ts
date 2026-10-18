@@ -1,12 +1,21 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Consultation } from 'src/consultation/entities/consultation.entity';
 import { LabOrder } from 'src/lab/entities/lab-order.entity';
+import { OrderStatus } from 'src/orders/enums/order-status.enum';
+import { ProcedureOrder } from 'src/orders/entities/procedure-order.entity';
 import { Prescription } from 'src/pharmacy/entities/prescription.entity';
 import { Visit } from 'src/queue/entities/visit.entity';
+import { Invoice } from 'src/payments/entities/invoice.entity';
+import { Payment } from 'src/payments/entities/payment.entity';
 import { VisitCharge } from 'src/payments/entities/visit-charge.entity';
 import { renderDischargeSummary } from './templates/discharge.template';
+import { renderProcedureReport } from './templates/procedure-report.template';
 import { renderPrescription } from './templates/prescription.template';
 import { renderVisitReceipt } from './templates/visit-receipt.template';
 import { renderHtml } from './render-html';
@@ -24,6 +33,12 @@ export class DocumentsService {
     private readonly visits: Repository<Visit>,
     @InjectRepository(VisitCharge)
     private readonly charges: Repository<VisitCharge>,
+    @InjectRepository(ProcedureOrder)
+    private readonly procedureOrders: Repository<ProcedureOrder>,
+    @InjectRepository(Invoice)
+    private readonly invoices: Repository<Invoice>,
+    @InjectRepository(Payment)
+    private readonly payments: Repository<Payment>,
   ) {}
 
   async renderPrescription(id: string, autoPrint = false): Promise<string> {
@@ -35,7 +50,10 @@ export class DocumentsService {
     return renderHtml(renderPrescription(prescription), { autoPrint });
   }
 
-  async renderDischargeSummary(consultationId: string, autoPrint = false): Promise<string> {
+  async renderDischargeSummary(
+    consultationId: string,
+    autoPrint = false,
+  ): Promise<string> {
     const consultation = await this.consultations.findOne({
       where: { id: consultationId },
       relations: { patient: true, doctor: true, diagnoses: true },
@@ -57,7 +75,10 @@ export class DocumentsService {
     );
   }
 
-  async renderVisitReceipt(visitId: string, autoPrint = false): Promise<string> {
+  async renderVisitReceipt(
+    visitId: string,
+    autoPrint = false,
+  ): Promise<string> {
     const visit = await this.visits.findOne({
       where: { id: visitId },
       relations: { patient: true },
@@ -72,7 +93,13 @@ export class DocumentsService {
       where: { visitId },
       order: { createdAt: 'ASC' },
     });
-    // Prescriptions link by consultation, not visit — collect via consultation IDs.
+    const invoice = await this.invoices.findOne({ where: { visitId } });
+    const payments = invoice
+      ? await this.payments.find({
+          where: { invoiceId: invoice.id },
+          order: { receivedAt: 'ASC' },
+        })
+      : [];
     const consultationIds = consultations.map((c) => c.id);
     const prescriptions = consultationIds.length
       ? await this.prescriptions
@@ -84,8 +111,27 @@ export class DocumentsService {
       : [];
 
     return renderHtml(
-      renderVisitReceipt({ visit, charges, prescriptions }),
+      renderVisitReceipt({ visit, invoice, charges, payments, prescriptions }),
       { autoPrint },
     );
+  }
+
+  async renderProcedureReport(id: string, autoPrint = false): Promise<string> {
+    const order = await this.procedureOrders.findOne({
+      where: { id },
+      relations: {
+        patient: true,
+        test: true,
+        orderedBy: true,
+        performedBy: true,
+      },
+    });
+    if (!order) throw new NotFoundException('Order not found');
+    if (order.status !== OrderStatus.COMPLETED) {
+      throw new BadRequestException(
+        'The report is available once the order is completed',
+      );
+    }
+    return renderHtml(renderProcedureReport(order), { autoPrint });
   }
 }

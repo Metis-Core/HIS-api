@@ -41,7 +41,7 @@ export function renderResultTable(
       </tr>`;
     })
     .join('');
-  return `<table><tr><th>Parameter</th><th>Result</th><th>Flag</th><th>Unit</th><th>Reference</th></tr>${rows}</table>`;
+  return `<table style="width:100%;border-collapse:collapse;font-size:12px"><tr><th>Parameter</th><th>Result</th><th>Flag</th><th>Unit</th><th>Reference</th></tr>${rows}</table>`;
 }
 
 export const FLAG_LEGEND =

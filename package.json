@@ -22,6 +22,7 @@
     "user:create-admin": "ts-node -r tsconfig-paths/register core/database/scripts/create-admin.ts",
     "user:seed": "ts-node -r tsconfig-paths/register core/database/scripts/seed-users.ts",
     "db:seed:icd": "ts-node -r tsconfig-paths/register core/database/scripts/seed-diagnosis-codes.ts",
+    "db:seed:procedures": "ts-node -r tsconfig-paths/register core/database/scripts/seed-procedure-catalogue.ts",
     "db:seed:lab": "ts-node -r tsconfig-paths/register core/database/scripts/seed-lab-catalogue.ts",
     "migration:generate": "bash core/database/scripts/generate-migration.sh",
     "migration:generate:raw": "npm run typeorm -- migration:generate -d core/database/data-source.ts",

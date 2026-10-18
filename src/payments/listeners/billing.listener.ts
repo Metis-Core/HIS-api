@@ -40,14 +40,14 @@ export class BillingListener {
 
   @OnEvent(ProcedureOrderedEvent.channel, { async: true })
   async onProcedureOrdered(event: ProcedureOrderedEvent) {
-    if (!event.visitId || !event.serviceId) return;
+    if (!event.visitId || event.price <= 0) return;
     try {
       await this.payments.addProcedureCharge(
         event.visitId,
         event.kind === OrderKind.RADIOLOGY
           ? ChargeSource.RADIOLOGY
           : ChargeSource.SURGERY,
-        { id: event.orderId, name: event.name, serviceId: event.serviceId },
+        { id: event.orderId, name: event.name, price: event.price },
         event.orderedById,
       );
     } catch (error) {

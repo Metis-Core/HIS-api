@@ -110,16 +110,15 @@ export class PaymentsService extends BaseCrudService<VisitCharge> {
   async addProcedureCharge(
     visitId: string,
     source: ChargeSource.RADIOLOGY | ChargeSource.SURGERY,
-    order: { id: string; name: string; serviceId: string },
+    order: { id: string; name: string; price: number },
     addedById: string,
   ): Promise<VisitCharge> {
-    const service = await this.servicesService.findOne(order.serviceId);
     return this.record({
       visitId,
       source,
       referenceId: order.id,
       description: order.name,
-      unitPrice: service.fee,
+      unitPrice: order.price,
       quantity: 1,
       addedById,
     });

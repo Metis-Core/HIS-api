@@ -86,4 +86,15 @@ export class DocumentsController {
     );
     sendDocument(res, html);
   }
+
+  @Get('procedure-report/:id')
+  @Roles(RoleGroups.CLINICAL_STAFF)
+  async procedureReport(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Query('print') print: string | undefined,
+    @Res() res: Response,
+  ) {
+    const html = await this.documents.renderProcedureReport(id, print === '1');
+    sendDocument(res, html);
+  }
 }

@@ -53,7 +53,7 @@ export function signatureBlock(orders: LabOrder[]): string {
     .map(([name, at]) => `${escape(name)} (${escape(formatDate(at))})`)
     .join(', ');
   return `
-    <mj-section padding="18px 24px 6px">
+    <mj-section padding="18px 32px 6px">
       <mj-column>
         <mj-text>Verified by: <strong>${names || 'Pending verification'}</strong></mj-text>
         <mj-text padding-top="18px">Signature: ______________________________ &nbsp; Date: ______________</mj-text>
