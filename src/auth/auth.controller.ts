@@ -1,3 +1,4 @@
+import { AuthThrottlerGuard } from 'core/security/auth-throttler.guard';
 import {
   Body,
   Controller,
@@ -14,6 +15,7 @@ import type { AuthenticatedUser } from 'common/interfaces/authenticated-user.int
 import type { JwtPayload } from 'common/interfaces/jwt-payload.interface';
 import { JwtRefreshGuard } from 'core/guards/jwt-refresh.guard';
 import { AuthService } from './auth.service';
+import { ChangePasswordDTO } from './dto/change-password.dto';
 import { LoginDto } from './dto/login.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
 
@@ -24,6 +26,7 @@ export class AuthController {
   @Public()
   @HttpCode(HttpStatus.OK)
   @Post('login')
+  @UseGuards(AuthThrottlerGuard)
   login(@Body() loginDto: LoginDto) {
     return this.authService.login(loginDto);
   }
@@ -48,6 +51,16 @@ export class AuthController {
     @Body() body: RefreshTokenDto,
   ): Promise<void> {
     await this.authService.logout(user.id, body.refreshToken);
+  }
+
+  @HttpCode(HttpStatus.OK)
+  @Post('change-password')
+  @UseGuards(AuthThrottlerGuard)
+  changePassword(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() dto: ChangePasswordDTO,
+  ) {
+    return this.authService.changePassword(user.id, dto);
   }
 
   @Get('me')

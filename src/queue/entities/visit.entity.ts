@@ -19,7 +19,7 @@ export class Visit extends BaseEntity {
   @Column({ type: 'uuid' })
   patientId: string;
 
-  @ManyToOne(() => Patient, { onDelete: 'CASCADE' })
+  @ManyToOne(() => Patient, { onDelete: 'RESTRICT' })
   @JoinColumn({ name: 'patientId' })
   patient: Patient;
 
@@ -27,7 +27,11 @@ export class Visit extends BaseEntity {
   visitType: VisitTypeEnum;
 
   @Index()
-  @Column({ type: 'enum', enum: VisitStatusEnum, default: VisitStatusEnum.OPEN })
+  @Column({
+    type: 'enum',
+    enum: VisitStatusEnum,
+    default: VisitStatusEnum.OPEN,
+  })
   status: VisitStatusEnum;
 
   @Column({ type: 'uuid' })

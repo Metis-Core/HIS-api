@@ -13,7 +13,9 @@ import { JwtPayload } from 'common/interfaces/jwt-payload.interface';
 import { PasswordService } from 'common/services/password.service';
 import { UsersService } from 'src/users/users.service';
 import { User } from 'src/users/entities/user.entity';
+import { UserResponseDto } from 'src/users/dto/user-response.dto';
 import { AuthTokensDto } from './dto/auth-tokens.dto';
+import { ChangePasswordDTO } from './dto/change-password.dto';
 import { LoginDto } from './dto/login.dto';
 import { AuthToken } from './entities/auth-token.entity';
 import { TokenType } from './enums/authToken.enum';
@@ -29,9 +31,11 @@ export class AuthService {
     private readonly passwordService: PasswordService,
     @InjectRepository(AuthToken)
     private readonly authTokensRepository: Repository<AuthToken>,
-  ) { }
+  ) {}
 
-  async login(dto: LoginDto): Promise<Record<string, any>> {
+  async login(
+    dto: LoginDto,
+  ): Promise<{ tokens: AuthTokensDto; user: UserResponseDto }> {
     const user = await this.usersService.findByEmailOrUsername(dto.identifier);
     if (!user) {
       throw new UnauthorizedException('Invalid credentials');
@@ -47,7 +51,7 @@ export class AuthService {
 
     this.usersService.assertAccountUsable(user);
     const { tokens } = await this.issueTokens(user);
-    return { tokens, user: user };
+    return { tokens, user: UserResponseDto.fromEntity(user) };
   }
 
   async refresh(requestUser: RefreshRequestUser): Promise<AuthTokensDto> {
@@ -109,8 +113,25 @@ export class AuthService {
     await this.revokeAllRefreshTokens(userId);
   }
 
-  async me(userId: string): Promise<User> {
-    return this.usersService.findOne(userId);
+  async changePassword(
+    userId: string,
+    dto: ChangePasswordDTO,
+  ): Promise<AuthTokensDto> {
+    await this.usersService.changeOwnPassword(
+      userId,
+      dto.currentPassword,
+      dto.newPassword,
+    );
+    // Sign out every other session, then hand this one fresh tokens.
+    await this.revokeAllRefreshTokens(userId);
+    const { tokens } = await this.issueTokens(
+      await this.usersService.findOne(userId),
+    );
+    return tokens;
+  }
+
+  async me(userId: string): Promise<UserResponseDto> {
+    return UserResponseDto.fromEntity(await this.usersService.findOne(userId));
   }
 
   generateOpaqueToken(): string {

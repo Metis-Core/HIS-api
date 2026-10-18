@@ -16,7 +16,7 @@ import { PrescriptionItem } from './prescription-item.entity';
 @Entity('prescriptions')
 @Index(['patientId', 'status'])
 export class Prescription extends BaseEntity {
-  @ManyToOne(() => Patient, { onDelete: 'CASCADE' })
+  @ManyToOne(() => Patient, { onDelete: 'RESTRICT' })
   @JoinColumn({ name: 'patientId' })
   patient: Patient;
 
@@ -37,7 +37,11 @@ export class Prescription extends BaseEntity {
   @Column({ type: 'uuid' })
   prescribedById: string;
 
-  @Column({ type: 'enum', enum: PrescriptionStatus, default: PrescriptionStatus.PENDING })
+  @Column({
+    type: 'enum',
+    enum: PrescriptionStatus,
+    default: PrescriptionStatus.PENDING,
+  })
   status: PrescriptionStatus;
 
   @Column({ type: 'text', nullable: true })

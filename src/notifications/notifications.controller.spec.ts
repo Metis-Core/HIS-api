@@ -9,7 +9,10 @@ describe('NotificationsController', () => {
     const module: TestingModule = await Test.createTestingModule({
       controllers: [NotificationsController],
       providers: [NotificationsService],
-    }).compile();
+    })
+      // Scaffold smoke test: stub every injected dependency.
+      .useMocker(() => ({}))
+      .compile();
 
     controller = module.get<NotificationsController>(NotificationsController);
   });

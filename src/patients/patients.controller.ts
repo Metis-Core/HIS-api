@@ -18,10 +18,7 @@ import { CreatePatientDto } from './dto/create-patient.dto';
 import { PatientFiltersDto } from './dto/patient-filters.dto';
 import { UpdatePatientDto } from './dto/update-patient.dto';
 import { PatientsService } from './patients.service';
-import {
-  formatErrorResponse,
-  formatResponse,
-} from '../../common/response-format';
+import { formatResponse } from '../../common/response-format';
 
 @Controller('patients')
 export class PatientsController {
@@ -37,11 +34,8 @@ export class PatientsController {
 
   @Get()
   @Roles(RoleGroups.FLOOR_STAFF)
-  async findAll() {
-    const patients = await this.patientsService.findManyWithPagination({
-      relations: { contact: true },
-    });
-    return formatResponse(patients);
+  async findAll(@Query() query: PatientFiltersDto) {
+    return formatResponse(await this.patientsService.search(query));
   }
 
   @Get(':id')
@@ -72,7 +66,7 @@ export class PatientsController {
   }
 
   @Delete(':id')
-  @Roles(RoleGroups.RECEPTION)
+  @Roles(RoleGroups.ADMINS)
   remove(@Param('id', ParseUUIDPipe) id: string) {
     return this.patientsService.remove(id);
   }

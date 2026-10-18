@@ -1,10 +1,4 @@
-import {
-  Column,
-  Entity,
-  Index,
-  JoinColumn,
-  ManyToOne,
-} from 'typeorm';
+import { Column, Entity, Index, JoinColumn, ManyToOne } from 'typeorm';
 import { BaseEntity } from 'common/entities/base.entity';
 import { Department } from 'common/enums/department.enum';
 import { Patient } from 'src/patients/entities/patient.entity';
@@ -20,7 +14,7 @@ export class Consultation extends BaseEntity {
   @Column({ type: 'uuid' })
   patientId: string;
 
-  @ManyToOne(() => Patient, { onDelete: 'CASCADE' })
+  @ManyToOne(() => Patient, { onDelete: 'RESTRICT' })
   @JoinColumn({ name: 'patientId' })
   patient: Patient;
 
@@ -64,7 +58,11 @@ export class Consultation extends BaseEntity {
   })
   status: ConsultationStatus;
 
-  @Column({ type: 'enum', enum: Department, default: Department.OUTPATIENT_CLINIC })
+  @Column({
+    type: 'enum',
+    enum: Department,
+    default: Department.OUTPATIENT_CLINIC,
+  })
   department: Department;
 
   @Column({ type: 'varchar', length: 500 })

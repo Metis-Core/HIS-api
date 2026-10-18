@@ -42,8 +42,8 @@ export class OtpService extends BaseCrudService<OneTimePassword> {
       expiresAt,
     });
 
-    // delivery integration (SMS/email) happens elsewhere; log for now
-    this.logger.log(`OTP for user ${userId}: ${code}`);
+    // No delivery channel yet; never log the code itself.
+    this.logger.log(`OTP issued for user ${userId}`);
 
     return { verificationToken, expiresAt };
   }
