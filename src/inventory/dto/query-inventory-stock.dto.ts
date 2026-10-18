@@ -9,6 +9,7 @@ import {
 } from 'class-validator';
 import { CatalogueFilterDTO } from 'common/dto/catalogue-filter.dto';
 import { MAX_PAGE_SIZE } from 'common/pagination';
+import { toList } from 'common/utils/query-list';
 
 export class QueryInventoryStockDTO extends CatalogueFilterDTO {
   @IsOptional()
@@ -17,9 +18,7 @@ export class QueryInventoryStockDTO extends CatalogueFilterDTO {
 
   // Lets a screen fetch on-hand quantities for just the rows it shows (comma-separated ids).
   @IsOptional()
-  @Transform(({ value }: { value: unknown }) =>
-    typeof value === 'string' ? value.split(',').filter(Boolean) : value,
-  )
+  @Transform(toList)
   @IsArray({ message: 'itemIds must be a comma-separated list of ids' })
   @ArrayMaxSize(MAX_PAGE_SIZE, {
     message: `itemIds cannot list more than ${MAX_PAGE_SIZE} items`,

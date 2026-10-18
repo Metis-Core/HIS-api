@@ -51,6 +51,11 @@ export class NotificationsService extends BaseCrudService<Notification> {
     if (query.userId) qb.andWhere('notification.userId = :userId', { userId: query.userId });
     if (query.status) qb.andWhere('notification.status = :status', { status: query.status });
     if (query.type) qb.andWhere('notification.type = :type', { type: query.type });
+    if (query.priority) {
+      qb.andWhere('notification.priority = :priority', {
+        priority: query.priority,
+      });
+    }
 
     const [items, total] = await qb
       .orderBy('notification.createdAt', sortOrder)

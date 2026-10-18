@@ -30,6 +30,7 @@ import { PrescriptionStatus } from './enums/prescription-status.enum';
 import { PrescriptionDispensedEvent } from './events/prescription-dispensed.event';
 import { PrescriptionCreatedEvent } from './events/prescription-created.event';
 import { PaginationQueryDTO, pageWindow, toPage } from 'common/pagination';
+import { wherePatientMatches } from 'common/utils/query-list';
 
 @Injectable()
 export class PharmacyService extends BaseCrudService<Prescription> {
@@ -145,7 +146,8 @@ export class PharmacyService extends BaseCrudService<Prescription> {
     if (query.patientId) qb.andWhere('prescription.patientId = :patientId', { patientId: query.patientId });
     if (query.consultationId) qb.andWhere('prescription.consultationId = :consultationId', { consultationId: query.consultationId });
     if (query.prescribedById) qb.andWhere('prescription.prescribedById = :prescribedById', { prescribedById: query.prescribedById });
-    if (query.status) qb.andWhere('prescription.status = :status', { status: query.status });
+    if (query.status?.length) qb.andWhere('prescription.status IN (:...statuses)', { statuses: query.status });
+    wherePatientMatches(qb, 'patient', query.search);
 
     const [items, total] = await qb
       .orderBy('prescription.createdAt', sortOrder)

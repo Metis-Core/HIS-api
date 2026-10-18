@@ -29,6 +29,7 @@ import { LabOrderCompletedEvent } from './events/lab-order-completed.event';
 import { LabOrderCancelledEvent } from './events/lab-order-cancelled.event';
 import { LabResultReadyEvent } from './events/lab-result-ready.event';
 import { PaginationQueryDTO, pageWindow, toPage } from 'common/pagination';
+import { wherePatientMatches } from 'common/utils/query-list';
 
 @Injectable()
 export class LabOrdersService extends BaseCrudService<LabOrder> {
@@ -144,7 +145,8 @@ export class LabOrdersService extends BaseCrudService<LabOrder> {
     if (query.consultationId) qb.andWhere('order.consultationId = :consultationId', { consultationId: query.consultationId });
     if (query.visitId) qb.andWhere('order.visitId = :visitId', { visitId: query.visitId });
     if (query.orderedById) qb.andWhere('order.orderedById = :orderedById', { orderedById: query.orderedById });
-    if (query.status) qb.andWhere('order.status = :status', { status: query.status });
+    if (query.status?.length) qb.andWhere('order.status IN (:...statuses)', { statuses: query.status });
+    wherePatientMatches(qb, 'patient', query.search);
     if (query.priority) qb.andWhere('order.priority = :priority', { priority: query.priority });
 
     const [items, total] = await qb
