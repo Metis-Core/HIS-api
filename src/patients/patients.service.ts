@@ -1,4 +1,8 @@
-import { ConflictException, Injectable } from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import {
@@ -14,6 +18,7 @@ import { CreatePatientDto } from './dto/create-patient.dto';
 import { PatientFiltersDto } from './dto/patient-filters.dto';
 import { UpdatePatientDto } from './dto/update-patient.dto';
 import { Patient } from './entities/patient.entity';
+import { PatientScope, scopeCondition } from './patient-scope.policy';
 import {
   PatientCreatedEvent,
   PatientDeletedEvent,
@@ -117,7 +122,23 @@ export class PatientsService extends BaseCrudService<Patient> {
     this.emit(new PatientDeletedEvent(toPatientEventData(patient)));
   }
 
-  async search(query: PatientFiltersDto): Promise<IPagination<Patient>> {
+  /** Opens a patient only if it is inside the caller's scope; otherwise 404, so ids cannot be probed. */
+  async findOneInScope(id: string, scope: PatientScope): Promise<Patient> {
+    const qb = this.patientsRepository
+      .createQueryBuilder('patient')
+      .leftJoinAndSelect('patient.contact', 'contact')
+      .where('patient.id = :id', { id });
+    const condition = scopeCondition(scope);
+    if (condition) qb.andWhere(condition);
+    const patient = await qb.getOne();
+    if (!patient) throw new NotFoundException('Patient not found');
+    return patient;
+  }
+
+  async search(
+    query: PatientFiltersDto,
+    scope: PatientScope = PatientScope.ALL,
+  ): Promise<IPagination<Patient>> {
     const {
       page = 1,
       limit = 20,
@@ -133,6 +154,9 @@ export class PatientsService extends BaseCrudService<Patient> {
       .orderBy('patient.createdAt', sortOrder)
       .skip(skip)
       .take(limit);
+
+    const condition = scopeCondition(scope);
+    if (condition) qb.andWhere(condition);
 
     // Every word must match some identifying field, so "jane nakato" finds Jane Nakato.
     const words = search?.trim().split(/\s+/).filter(Boolean) ?? [];

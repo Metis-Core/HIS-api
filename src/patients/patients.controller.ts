@@ -14,6 +14,9 @@ import {
 } from '@nestjs/common';
 import { RoleGroups } from 'common/access/role-groups';
 import { Roles } from 'common/decorators/roles.decorator';
+import { CurrentUser } from 'common/decorators/current-user.decorator';
+import type { AuthenticatedUser } from 'common/interfaces/authenticated-user.interface';
+import { patientScopeFor } from './patient-scope.policy';
 import { CreatePatientDto } from './dto/create-patient.dto';
 import { PatientFiltersDto } from './dto/patient-filters.dto';
 import { UpdatePatientDto } from './dto/update-patient.dto';
@@ -34,16 +37,25 @@ export class PatientsController {
 
   @Get()
   @Roles(RoleGroups.FLOOR_STAFF)
-  async findAll(@Query() query: PatientFiltersDto) {
-    return formatResponse(await this.patientsService.search(query));
+  async findAll(
+    @Query() query: PatientFiltersDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return formatResponse(
+      await this.patientsService.search(query, patientScopeFor(user.role)),
+    );
   }
 
   @Get(':id')
   @Roles(RoleGroups.FLOOR_STAFF)
-  async findOne(@Param('id', ParseUUIDPipe) id: string) {
-    const patient = await this.patientsService.findByStringId(id, {
-      relations: { contact: true },
-    });
+  async findOne(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    const patient = await this.patientsService.findOneInScope(
+      id,
+      patientScopeFor(user.role),
+    );
     return formatResponse(patient);
   }
 

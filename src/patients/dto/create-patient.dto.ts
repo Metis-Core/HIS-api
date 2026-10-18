@@ -1,12 +1,11 @@
 import {
   IsDateString,
+  IsDefined,
   IsEmail,
   IsEnum,
   IsNotEmpty,
   IsOptional,
   IsString,
-  IsUUID,
-  Matches,
   MaxLength,
   ValidateNested,
 } from 'class-validator';
@@ -96,6 +95,7 @@ export class CreatePatientDto {
   @IsString()
   allergies?: string;
 
+  @IsDefined({ message: 'emergencyContact (next of kin) is required' })
   @ValidateNested()
   @Type(() => CreateContactDTO)
   emergencyContact: CreateContactDTO;
