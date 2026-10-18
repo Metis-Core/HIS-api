@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { DeepPartial, In, Like, QueryFailedError, Repository } from 'typeorm';
@@ -11,6 +15,7 @@ import { IPagination } from 'common/response-format';
 import { QueueEntry } from './entities/queue-entry.entity';
 import { Visit } from './entities/visit.entity';
 import { QueueEntryStatus } from './enums/queue-entry-status.enum';
+import { findActiveVisit } from './journey/active-visit';
 import { planCheckIn } from './journey/check-in-plan';
 import { intentDepartmentMap } from './intent-department.map';
 import { VisitIntenentsEnum } from './enums/visit-type.enum';
@@ -58,6 +63,11 @@ export class VisitsService extends BaseCrudService<Visit> {
     if (!patientId || !(await this.patientsService.findByStringId(patientId))) {
       throw new NotFoundException('Patient not found');
     }
+    if (await this.findActiveFor(patientId)) {
+      throw new ConflictException(
+        'This patient already has an open visit. Finish or discharge it before starting another.',
+      );
+    }
 
     const triageCategory = resolveCheckInCategory(
       visitType,
@@ -102,6 +112,10 @@ export class VisitsService extends BaseCrudService<Visit> {
     );
 
     return visit;
+  }
+
+  findActiveFor(patientId: string): Promise<Visit | null> {
+    return findActiveVisit(this.visitsRepository.manager, patientId);
   }
 
   // Two emergency check-ins in the same second can pick the same number; the unique index decides and we retry.

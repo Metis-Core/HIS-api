@@ -7,21 +7,13 @@ import { Patient } from 'src/patients/entities/patient.entity';
 import { QueueEntry } from './entities/queue-entry.entity';
 import { Visit } from './entities/visit.entity';
 import { QueueEntryStatus } from './enums/queue-entry-status.enum';
-import { VisitStatusEnum } from './enums/visit-status.enum';
 import { VisitIntenentsEnum, VisitTypeEnum } from './enums/visit-type.enum';
 import { VisitCheckedInEvent } from './events/visit-checked-in.event';
+import { ACTIVE_VISIT_STATUSES, findActiveVisit } from './journey/active-visit';
 import { priorityFor } from './journey/visit-priority';
 
 export const LAB_ONLY_INTENTS = [VisitIntenentsEnum.LAB];
-const OPEN_QUEUE_STATUSES = [
-  QueueEntryStatus.WAITING,
-  QueueEntryStatus.CALLED,
-  QueueEntryStatus.IN_SERVICE,
-];
-export const ACTIVE_VISIT_STATUSES = [
-  VisitStatusEnum.OPEN,
-  VisitStatusEnum.IN_PROGRESS,
-];
+export { ACTIVE_VISIT_STATUSES };
 
 /** L1/L9: a walk-in who only needs tests gets a visit with a lab stage and no consultation (so no consultation fee). */
 @Injectable()
@@ -46,21 +38,8 @@ export class LabOnlyVisitsService {
     );
   }
 
-  // Visit status is not advanced anywhere yet, so "active" means a visit still in someone's queue.
   findActive(manager: EntityManager, patientId: string): Promise<Visit | null> {
-    return manager
-      .createQueryBuilder(Visit, 'visit')
-      .where('visit.patientId = :patientId', { patientId })
-      .andWhere('visit.status IN (:...statuses)', {
-        statuses: ACTIVE_VISIT_STATUSES,
-      })
-      .andWhere(
-        'EXISTS (SELECT 1 FROM "queue_entries" qe WHERE qe."visitId" = visit.id AND qe."deletedAt" IS NULL AND qe."status" IN (:...open))',
-        { open: OPEN_QUEUE_STATUSES },
-      )
-      .orderBy('visit.createdAt', 'DESC')
-      .addOrderBy('visit.id', 'DESC')
-      .getOne();
+    return findActiveVisit(manager, patientId);
   }
 
   // Runs inside the caller's transaction; the check-in event waits for the commit.

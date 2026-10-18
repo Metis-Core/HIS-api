@@ -171,6 +171,12 @@ export class VisitController {
     return formatResponse(visit);
   }
 
+  @Get('active/:patientId')
+  @Roles(RoleGroups.FLOOR_STAFF)
+  async getActiveVisit(@Param('patientId', ParseUUIDPipe) patientId: string) {
+    return formatResponse(await this.visitService.findActiveFor(patientId));
+  }
+
   @Get(':id/timeline')
   @Roles(RoleGroups.FLOOR_STAFF)
   async getVisitTimeline(@Param('id', ParseUUIDPipe) id: string) {

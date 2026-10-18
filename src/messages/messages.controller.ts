@@ -13,6 +13,7 @@ import { CurrentUser } from 'common/decorators/current-user.decorator';
 import type { AuthenticatedUser } from 'common/interfaces/authenticated-user.interface';
 import { PaginationQueryDTO } from 'common/pagination';
 import { formatResponse } from 'common/response-format';
+import { MessageTeamParam } from './dto/message-team.param';
 import { QueryContactsDto } from './dto/query-contacts.dto';
 import { SendMessageDto } from './dto/send-message.dto';
 import { MessagesService } from './messages.service';
@@ -34,6 +35,29 @@ export class MessagesController {
   @Get('conversations')
   async conversations(@CurrentUser() user: AuthenticatedUser) {
     return formatResponse(await this.messages.conversations(user.id));
+  }
+
+  @Get('teams')
+  async teams(@CurrentUser() user: AuthenticatedUser) {
+    return formatResponse(await this.messages.teamConversations(user.id));
+  }
+
+  @Get('teams/:team')
+  async teamThread(
+    @Param() { team }: MessageTeamParam,
+    @Query() query: PaginationQueryDTO,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return formatResponse(await this.messages.teamThread(user.id, team, query));
+  }
+
+  @Post('teams/:team/read')
+  @HttpCode(HttpStatus.OK)
+  async markTeamRead(
+    @Param() { team }: MessageTeamParam,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return formatResponse(await this.messages.markTeamRead(user.id, team));
   }
 
   @Get('unread')

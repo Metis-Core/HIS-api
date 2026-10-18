@@ -12,11 +12,13 @@ import { MessagesService } from './messages.service';
 
 const messages = {
   create: jest.fn((value: object) => value),
-  save: jest.fn((value: object) => Promise.resolve({ id: 'm1', ...value })),
+  save: jest.fn((value: object[]) =>
+    Promise.resolve(value.map((row, i) => ({ id: `m${i + 1}`, ...row }))),
+  ),
   update: jest.fn(),
   countBy: jest.fn(),
 };
-const users = { findOneBy: jest.fn() };
+const users = { findOneBy: jest.fn(), find: jest.fn() };
 const visits = { existsBy: jest.fn() };
 const events = { emit: jest.fn() };
 
@@ -99,6 +101,42 @@ describe('MessagesService', () => {
       service.send({ recipientId: 'r1', body: 'hi', visitId: 'v9' }, 's1'),
     ).rejects.toBeInstanceOf(NotFoundException);
     expect(messages.save).not.toHaveBeenCalled();
+  });
+
+  it('writes one copy per team member under a shared batch and notifies each', async () => {
+    // Arrange
+    users.find.mockResolvedValue([{ id: 'p1' }, { id: 'p2' }]);
+
+    // Act
+    await service.send({ team: 'pharmacy', body: 'Out of ORS?' }, 's1');
+
+    // Assert
+    const rows = messages.save.mock.calls[0][0] as {
+      recipientId: string;
+      teamRole: string;
+      batchId: string;
+    }[];
+    expect(rows.map((r) => r.recipientId)).toEqual(['p1', 'p2']);
+    expect(rows.every((r) => r.teamRole === 'pharmacy')).toBe(true);
+    expect(new Set(rows.map((r) => r.batchId)).size).toBe(1);
+    expect(events.emit).toHaveBeenCalledTimes(2);
+    expect(events.emit).toHaveBeenCalledWith(
+      MessageSentEvent.channel,
+      expect.objectContaining({ recipientId: 'p2', team: 'pharmacy' }),
+    );
+  });
+
+  it('refuses a team nobody is in, and a message with no audience', async () => {
+    // Arrange
+    users.find.mockResolvedValue([]);
+
+    // Act and assert
+    await expect(
+      service.send({ team: 'accounts', body: 'hi' }, 's1'),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    await expect(service.send({ body: 'hi' }, 's1')).rejects.toBeInstanceOf(
+      BadRequestException,
+    );
   });
 
   it('marks only the messages sent to you by that person as read', async () => {

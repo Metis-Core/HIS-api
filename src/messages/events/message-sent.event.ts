@@ -1,3 +1,5 @@
+import type { MessageTeam } from '../message-teams';
+
 export class MessageSentEvent {
   static readonly channel = 'message.sent';
 
@@ -8,5 +10,6 @@ export class MessageSentEvent {
     readonly recipientId: string,
     readonly preview: string,
     readonly visitId: string | null,
+    readonly team: MessageTeam | null = null,
   ) {}
 }

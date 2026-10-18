@@ -3,7 +3,7 @@ import { BaseEntity } from 'common/entities/base.entity';
 import { Visit } from 'src/queue/entities/visit.entity';
 import { User } from 'src/users/entities/user.entity';
 
-/** A direct message between two staff members, optionally about a visit. */
+/** A message from one staff member to another or to a team, optionally about a visit. */
 @Entity('messages')
 @Index(['recipientId', 'readAt'])
 @Index(['senderId', 'recipientId', 'createdAt'])
@@ -31,6 +31,14 @@ export class Message extends BaseEntity {
   @ManyToOne(() => Visit, { onDelete: 'SET NULL', nullable: true })
   @JoinColumn({ name: 'visitId' })
   visit: Visit | null;
+
+  /** Set when the message was written to a team; one copy per member shares a batchId. */
+  @Column({ type: 'varchar', length: 20, nullable: true })
+  teamRole: string | null;
+
+  @Index()
+  @Column({ type: 'uuid', nullable: true })
+  batchId: string | null;
 
   @Column({ type: 'timestamptz', nullable: true })
   readAt: Date | null;

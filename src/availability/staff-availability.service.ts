@@ -16,6 +16,7 @@ export interface StaffAvailability {
   username: string;
   role: UserRole;
   department: Department;
+  accountStatus: AccountStatus;
   availability: AvailabilityStatus;
   until: Date | null;
   note: string | null;
@@ -33,9 +34,10 @@ export class StaffAvailabilityService extends BaseCrudService<User> {
 
   async search(
     query: QueryStaffAvailabilityDto,
+    includeInactive = false,
   ): Promise<IPagination<StaffAvailability>> {
     const base: FindOptionsWhere<User> = {
-      status: AccountStatus.ACTIVE,
+      ...(includeInactive ? {} : { status: AccountStatus.ACTIVE }),
       ...(query.role ? { role: query.role } : {}),
     };
     const term = query.search?.trim();
@@ -57,6 +59,7 @@ export class StaffAvailabilityService extends BaseCrudService<User> {
         username: user.username,
         role: user.role,
         department: user.department,
+        accountStatus: user.status,
         availability: resolved.status,
         until: resolved.until,
         note: resolved.note,

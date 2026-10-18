@@ -16,6 +16,7 @@ import { PrescriptionStatus } from 'src/pharmacy/enums/prescription-status.enum'
 import { PrescriptionCreatedEvent } from 'src/pharmacy/events/prescription-created.event';
 import { PrescriptionDispensedEvent } from 'src/pharmacy/events/prescription-dispensed.event';
 import { MessageSentEvent } from 'src/messages/events/message-sent.event';
+import { MESSAGE_TEAMS } from 'src/messages/message-teams';
 import { DoctorAssignedEvent } from 'src/doctors/events/doctor-assigned.event';
 import { DoctorRequestUnavailableEvent } from 'src/doctors/events/doctor-request-unavailable.event';
 import { QueueEntry } from 'src/queue/entities/queue-entry.entity';
@@ -191,9 +192,13 @@ export class WorkflowNotificationsListener {
       await this.dispatcher.toUsers([event.recipientId], {
         type: NotificationType.MESSAGE,
         priority: NotificationPriority.NORMAL,
-        title: `Message from ${event.senderName}`,
+        title: event.team
+          ? `${event.senderName} to ${MESSAGE_TEAMS[event.team].label}`
+          : `Message from ${event.senderName}`,
         body: event.preview,
-        actionUrl: `/messages?with=${event.senderId}`,
+        actionUrl: event.team
+          ? `/messages?team=${event.team}`
+          : `/messages?with=${event.senderId}`,
         resourceType: 'message',
         resourceId: event.messageId,
       });

@@ -5,8 +5,9 @@ import {
 } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Brackets, Repository } from 'typeorm';
 import { pageWindow, toPage } from 'common/pagination';
+import { containsPattern } from 'common/utils/like-pattern';
 import { IPagination } from 'common/response-format';
 import { interpretResult } from 'src/lab/results/interpret-result';
 import { patientContext } from 'src/lab/results/patient-context';
@@ -87,17 +88,45 @@ export class ClinicRecordsService {
 
   async list(query: QueryClinicRecordsDto): Promise<IPagination<ClinicRecord>> {
     const window = pageWindow(query);
-    const [items, total] = await this.records.findAndCount({
-      where: {
-        ...(query.patientId && { patientId: query.patientId }),
-        ...(query.visitId && { visitId: query.visitId }),
-        ...(query.kind && { kind: query.kind }),
-      },
-      relations: { recordedBy: true },
-      order: { createdAt: 'DESC', id: 'DESC' },
-      skip: window.skip,
-      take: window.take,
+    const qb = this.records
+      .createQueryBuilder('record')
+      .leftJoinAndSelect('record.patient', 'patient')
+      .leftJoinAndSelect('record.recordedBy', 'recordedBy')
+      .orderBy('record.createdAt', 'DESC')
+      .addOrderBy('record.id', 'DESC')
+      .skip(window.skip)
+      .take(window.take);
+    if (query.patientId) {
+      qb.andWhere('record.patientId = :patientId', {
+        patientId: query.patientId,
+      });
+    }
+    if (query.visitId) {
+      qb.andWhere('record.visitId = :visitId', { visitId: query.visitId });
+    }
+    if (query.kind) qb.andWhere('record.kind = :kind', { kind: query.kind });
+    if (query.from) {
+      qb.andWhere('record.createdAt >= :from', { from: query.from });
+    }
+    if (query.to) {
+      qb.andWhere(`record.createdAt < (:to::date + interval '1 day')`, {
+        to: query.to,
+      });
+    }
+    const words = query.search?.split(/\s+/).filter(Boolean) ?? [];
+    words.forEach((word, index) => {
+      const param = `term${index}`;
+      qb.andWhere(
+        new Brackets((sub) => {
+          for (const field of ['firstName', 'lastName', 'mrn']) {
+            sub.orWhere(`patient.${field} ILIKE :${param}`, {
+              [param]: containsPattern(word),
+            });
+          }
+        }),
+      );
     });
+    const [items, total] = await qb.getManyAndCount();
     return toPage(items, total, window);
   }
 }
