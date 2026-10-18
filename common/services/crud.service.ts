@@ -7,7 +7,8 @@ import {
   FindManyOptions,
 } from 'typeorm';
 import { BaseEntity } from '../entities/base.entity';
-import { buildPaginationMeta, IPagination } from '../response-format';
+import { IPagination } from '../response-format';
+import { DEFAULT_PAGE_SIZE, pageWindow, toPage } from '../pagination';
 
 @Injectable()
 export abstract class BaseCrudService<T extends BaseEntity> {
@@ -50,14 +51,27 @@ export abstract class BaseCrudService<T extends BaseEntity> {
   public async findManyWithPagination(
     options?: FindManyOptions<T>,
   ): Promise<IPagination<T>> {
+    const take = options?.take ? Number(options.take) : undefined;
     const skip = options?.skip ? Number(options.skip) : 0;
-    const take = options?.take ? Number(options.take) : 10;
+    const limit = take ?? DEFAULT_PAGE_SIZE;
+    return this.findPage(options ?? {}, {
+      page: Math.floor(skip / limit) + 1,
+      limit,
+    });
+  }
+
+  /** One page of rows in the standard IPagination shape; page/limit are clamped to safe bounds. */
+  public async findPage(
+    options: Omit<FindManyOptions<T>, 'skip' | 'take'>,
+    query: { page?: number; limit?: number } = {},
+  ): Promise<IPagination<T>> {
+    const window = pageWindow(query);
     const [items, total] = await this.repository.findAndCount({
       ...options,
-      skip,
-      take,
+      skip: window.skip,
+      take: window.take,
     });
-    return { items, total, meta: buildPaginationMeta(total, skip, take) };
+    return toPage(items, total, window);
   }
 
   async findOneByWhere(options: FindOneOptions<T>): Promise<T | undefined> {

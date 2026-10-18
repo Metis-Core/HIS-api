@@ -6,6 +6,8 @@ import { Department } from 'common/enums/department.enum';
 import { PatientsService } from 'src/patients/patients.service';
 import { UsersService } from 'src/users/users.service';
 import { CreateVisitDTO } from './dto/create-visit.dto';
+import { QueryVisitsDTO } from './dto/query-visits.dto';
+import { IPagination } from 'common/response-format';
 import { QueueEntry } from './entities/queue-entry.entity';
 import { Visit } from './entities/visit.entity';
 import { QueueEntryStatus } from './enums/queue-entry-status.enum';
@@ -167,6 +169,23 @@ export class VisitsService extends BaseCrudService<Visit> {
       );
     }
     return visit;
+  }
+
+  /** Visit history, newest first; filters narrow it to one patient, status or visit type. */
+  async search(query: QueryVisitsDTO): Promise<IPagination<Visit>> {
+    const { patientId, status, visitType, sortOrder = 'DESC' } = query;
+    return this.findPage(
+      {
+        where: {
+          ...(patientId ? { patientId } : {}),
+          ...(status ? { status } : {}),
+          ...(visitType ? { visitType } : {}),
+        },
+        relations: { patient: true, queueEntries: true },
+        order: { createdAt: sortOrder, id: sortOrder },
+      },
+      query,
+    );
   }
 
   async timeline(id: string): Promise<VisitTimeline> {

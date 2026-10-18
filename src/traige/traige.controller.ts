@@ -21,6 +21,7 @@ import { CreateTriageDto } from './dto/create-traige.dto';
 import { QueryTriageDto } from './dto/query-triage.dto';
 import { UpdateTriageDto } from './dto/update-traige.dto';
 import { TraigeService } from './traige.service';
+import { PaginationQueryDTO } from 'common/pagination';
 
 @Controller('triage')
 export class TraigeController {
@@ -50,8 +51,11 @@ export class TraigeController {
 
   @Get('patient/:patientId')
   @Roles(RoleGroups.FRONT_DESK_CLINICAL)
-  findByPatient(@Param('patientId', ParseUUIDPipe) patientId: string) {
-    return this.traigeService.findByPatient(patientId);
+  findByPatient(
+    @Param('patientId', ParseUUIDPipe) patientId: string,
+    @Query() query: PaginationQueryDTO,
+  ) {
+    return this.traigeService.findByPatient(patientId, query);
   }
 
   @Get(':id')

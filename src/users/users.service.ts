@@ -43,14 +43,7 @@ export class UsersService extends BaseCrudService<User> {
   }
 
   async search(query: QueryUsersDto): Promise<IPagination<User>> {
-    const {
-      page = 1,
-      limit = 20,
-      sortOrder = 'DESC',
-      role,
-      department,
-      status,
-    } = query;
+    const { sortOrder = 'DESC', role, department, status } = query;
     const base: FindOptionsWhere<User> = {
       ...(role ? { role } : {}),
       ...(department ? { department } : {}),
@@ -64,12 +57,10 @@ export class UsersService extends BaseCrudService<User> {
         ]
       : base;
 
-    return this.findManyWithPagination({
-      where,
-      order: { createdAt: sortOrder },
-      skip: (page - 1) * limit,
-      take: limit,
-    });
+    return this.findPage(
+      { where, order: { createdAt: sortOrder, id: sortOrder } },
+      query,
+    );
   }
 
   async findById(id: string): Promise<User | null> {

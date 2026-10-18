@@ -2,6 +2,7 @@ import { ConflictException, Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { IPagination } from 'common/response-format';
+import { pageWindow, toPage } from 'common/pagination';
 import { BaseCrudService } from '../../common/services/crud.service';
 import { CreateServiceDTO } from './dto/create-service.dto';
 import { QueryServicesDTO } from './dto/query-services.dto';
@@ -47,7 +48,8 @@ export class ServicesService extends BaseCrudService<Service> {
   async findAllPaginated(
     query: QueryServicesDTO,
   ): Promise<IPagination<Service>> {
-    const { page = 1, limit = 20, sortOrder = 'ASC' } = query;
+    const window = pageWindow(query);
+    const sortOrder = query.sortOrder ?? 'ASC';
     const qb = this.servicesRepository.createQueryBuilder('service');
 
     if (query.search) {
@@ -61,11 +63,12 @@ export class ServicesService extends BaseCrudService<Service> {
 
     const [items, total] = await qb
       .orderBy('service.name', sortOrder)
-      .skip((page - 1) * limit)
-      .take(limit)
+      .addOrderBy('service.id', sortOrder)
+      .skip(window.skip)
+      .take(window.take)
       .getManyAndCount();
 
-    return { items, total };
+    return toPage(items, total, window);
   }
 
   async findConsultationService(): Promise<Service | null> {

@@ -38,8 +38,8 @@ export class ServicesController {
   async findAll(
     @Query() query: QueryServicesDTO,
   ): Promise<IPagination<ServiceResponseDTO>> {
-    const { items, total } = await this.servicesService.findAllPaginated(query);
-    return { items: ServiceResponseDTO.fromEntities(items), total };
+    const page = await this.servicesService.findAllPaginated(query);
+    return { ...page, items: ServiceResponseDTO.fromEntities(page.items) };
   }
 
   @Get('consultation-fee')

@@ -12,8 +12,9 @@ export interface IPaginationMeta {
 
 export type IPagination<T> = {
   readonly items: T[];
+  /** Kept alongside meta.total for clients written before meta existed. */
   readonly total: number;
-  readonly meta?: IPaginationMeta;
+  readonly meta: IPaginationMeta;
 };
 
 export interface ApiErrorBody {

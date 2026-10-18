@@ -1,23 +1,10 @@
-import { Type } from 'class-transformer';
-import { IsIn, IsOptional, Min, IsInt, Max } from 'class-validator';
+import { IsIn, IsOptional } from 'class-validator';
+import { PaginationQueryDTO } from '../pagination';
 
-export class BaseFilterDTO {
+export class BaseFilterDTO extends PaginationQueryDTO {
   @IsOptional()
-  @IsIn(['ASC', 'DESC'])
+  @IsIn(['ASC', 'DESC'], { message: 'sortOrder must be ASC or DESC' })
   sortOrder?: 'ASC' | 'DESC' = 'DESC';
-
-  @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  @Min(1)
-  page?: number = 1;
-
-  @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  @Min(1)
-  @Max(200)
-  limit?: number = 20;
 
   @IsOptional()
   createdAt?: Date;

@@ -15,6 +15,8 @@ import { CreateTriageDto } from './dto/create-traige.dto';
 import { QueryTriageDto } from './dto/query-triage.dto';
 import { UpdateTriageDto } from './dto/update-traige.dto';
 import { Triage } from './entities/traige.entity';
+import { IPagination } from 'common/response-format';
+import { PaginationQueryDTO, pageWindow, toPage } from 'common/pagination';
 
 @Injectable()
 export class TraigeService extends BaseCrudService<Triage> {
@@ -95,14 +97,8 @@ export class TraigeService extends BaseCrudService<Triage> {
     return triageRecord;
   }
 
-  async search(query: QueryTriageDto): Promise<{
-    items: Triage[];
-    total: number;
-    page: number;
-    limit: number;
-  }> {
-    const page = query.page ?? 1;
-    const limit = query.limit ?? 20;
+  async search(query: QueryTriageDto): Promise<IPagination<Triage>> {
+    const window = pageWindow(query);
     const sortBy = query.sortBy ?? 'createdAt';
     const sortOrder = query.sortOrder ?? 'DESC';
 
@@ -166,20 +162,28 @@ export class TraigeService extends BaseCrudService<Triage> {
     }
 
     qb.orderBy(`triage.${sortBy}`, sortOrder)
-      .skip((page - 1) * limit)
-      .take(limit);
+      .addOrderBy('triage.id', sortOrder)
+      .skip(window.skip)
+      .take(window.take);
 
     const [items, total] = await qb.getManyAndCount();
-    return { items, total, page, limit };
+    return toPage(items, total, window);
   }
 
-  async findByPatient(patientId: string): Promise<Triage[]> {
+  // Patient history grows for years, so it is paged newest-first like every other list.
+  async findByPatient(
+    patientId: string,
+    query: PaginationQueryDTO = {},
+  ): Promise<IPagination<Triage>> {
     await this.patientsService.findOne(patientId);
-    return this.triageRepository.find({
-      where: { patientId },
-      order: { createdAt: 'DESC' },
-      relations: { patient: true },
-    });
+    return this.findPage(
+      {
+        where: { patientId },
+        relations: { patient: true },
+        order: { createdAt: 'DESC', id: 'DESC' },
+      },
+      query,
+    );
   }
 
   async findQueue(

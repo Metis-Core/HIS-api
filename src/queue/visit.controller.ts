@@ -9,6 +9,7 @@ import {
   ParseUUIDPipe,
   Post,
   Put,
+  Query,
   UsePipes,
   ValidationPipe,
 } from '@nestjs/common';
@@ -25,6 +26,7 @@ import { UpdateVisitDTO } from './dto/update-visit.dto';
 import { AppendIntentsDTO } from './dto/append-intents.dto';
 import { ChangePriorityDTO } from './dto/change-priority.dto';
 import { assertCanRouteClinically } from './journey/assert-can-route';
+import { QueryVisitsDTO } from './dto/query-visits.dto';
 
 @Controller('visits')
 export class VisitController {
@@ -35,11 +37,8 @@ export class VisitController {
 
   @Get()
   @Roles(RoleGroups.FLOOR_STAFF)
-  async getAllVisits() {
-    const visits = await this.visitService.findManyWithPagination({
-      relations: { queueEntries: true },
-    });
-    return formatResponse(visits);
+  async getAllVisits(@Query() query: QueryVisitsDTO) {
+    return formatResponse(await this.visitService.search(query));
   }
 
   @Get('/queues')

@@ -30,7 +30,8 @@ import {
 } from './events/patient.events';
 import { ContactsService } from '../contacts/contacts.service';
 import { BaseCrudService } from '../../common/services/crud.service';
-import { buildPaginationMeta, IPagination } from '../../common/response-format';
+import { IPagination } from '../../common/response-format';
+import { pageWindow, toPage } from '../../common/pagination';
 import { containsPattern } from '../../common/utils/like-pattern';
 
 const SEARCHABLE_FIELDS = [
@@ -154,21 +155,16 @@ export class PatientsService extends BaseCrudService<Patient> {
     query: PatientFiltersDto,
     scope: PatientScope = PatientScope.ALL,
   ): Promise<IPagination<Patient>> {
-    const {
-      page = 1,
-      limit = 20,
-      sortOrder = 'DESC',
-      search,
-      ...filters
-    } = query;
-    const skip = (page - 1) * limit;
+    const { page, limit, sortOrder = 'DESC', search, ...filters } = query;
+    const window = pageWindow({ page, limit });
     const qb = this.patientsRepository
       .createQueryBuilder('patient')
       .leftJoinAndSelect('patient.contact', 'contact')
       .where(this.buildWhere(filters))
       .orderBy('patient.createdAt', sortOrder)
-      .skip(skip)
-      .take(limit);
+      .addOrderBy('patient.id', sortOrder)
+      .skip(window.skip)
+      .take(window.take);
 
     const condition = scopeCondition(scope);
     if (condition) qb.andWhere(condition);
@@ -189,7 +185,7 @@ export class PatientsService extends BaseCrudService<Patient> {
     });
 
     const [items, total] = await qb.getManyAndCount();
-    return { items, total, meta: buildPaginationMeta(total, skip, limit) };
+    return toPage(items, total, window);
   }
 
   private buildWhere(

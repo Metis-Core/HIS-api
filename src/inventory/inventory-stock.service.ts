@@ -16,6 +16,8 @@ import { InventoryTransaction } from './entities/inventory-transaction.entity';
 import { InventoryTransactionType } from './enums/inventoryTransactionType.enum';
 import { QuantityUnit } from './enums/quantity-unit.enum';
 import { StockLowEvent } from './events/stock-low.event';
+import { PaginationQueryDTO, pageWindow, toPage } from 'common/pagination';
+import { QueryInventoryStockDTO } from './dto/query-inventory-stock.dto';
 
 const NEGATIVE_TXN_TYPES = new Set<InventoryTransactionType>([
   InventoryTransactionType.ISSUE,
@@ -46,12 +48,37 @@ export class InventoryStockService {
     private readonly eventEmitter: EventEmitter2,
   ) {}
 
-  async getStockLevels(storeId?: string): Promise<InventoryStock[]> {
-    return this.stockRepository.find({
-      where: storeId ? { storeId } : {},
-      relations: { store: true, item: true },
-      order: { updatedAt: 'DESC' },
-    });
+  /** Stock rows A→Z by item name (a reference list), optionally narrowed to a store, items or a search. */
+  async getStockLevels(
+    query: QueryInventoryStockDTO = {},
+  ): Promise<IPagination<InventoryStock>> {
+    const window = pageWindow(query);
+    const sortOrder = query.sortOrder ?? 'ASC';
+    const qb = this.stockRepository
+      .createQueryBuilder('stock')
+      .innerJoinAndSelect('stock.item', 'item')
+      .innerJoinAndSelect('stock.store', 'store');
+    if (query.storeId) {
+      qb.andWhere('stock.storeId = :storeId', { storeId: query.storeId });
+    }
+    if (query.itemIds?.length) {
+      qb.andWhere('stock.itemId IN (:...itemIds)', { itemIds: query.itemIds });
+    }
+    if (query.search?.trim()) {
+      const term = `%${query.search.trim().toLowerCase()}%`;
+      qb.andWhere(
+        '(LOWER(item.name) LIKE :term OR LOWER(item.sku) LIKE :term)',
+        { term },
+      );
+    }
+    const [items, total] = await qb
+      .orderBy('item.name', sortOrder)
+      .addOrderBy('store.name', 'ASC')
+      .addOrderBy('stock.id', 'ASC')
+      .skip(window.skip)
+      .take(window.take)
+      .getManyAndCount();
+    return toPage(items, total, window);
   }
 
   async getStockFor(storeId: string, itemId: string): Promise<InventoryStock> {
@@ -153,8 +180,7 @@ export class InventoryStockService {
   async searchTransactions(
     query: QueryInventoryTransactionsDto,
   ): Promise<IPagination<InventoryTransaction>> {
-    const page = query.page ?? 1;
-    const limit = query.limit ?? 20;
+    const window = pageWindow(query);
     const sortOrder = query.sortOrder ?? 'DESC';
 
     const qb = this.transactionsRepository
@@ -170,22 +196,35 @@ export class InventoryStockService {
 
     const [items, total] = await qb
       .orderBy('txn.createdAt', sortOrder)
-      .skip((page - 1) * limit)
-      .take(limit)
+      // Tie-break on id so rows never repeat or vanish between pages.
+      .addOrderBy('txn.id', sortOrder)
+      .skip(window.skip)
+      .take(window.take)
       .getManyAndCount();
 
-    return { items, total };
+    return toPage(items, total, window);
   }
 
-  async listLowStock(): Promise<Array<InventoryStock & { minStockLevel: number }>> {
-    const rows = await this.stockRepository
+  // Most urgent first (lowest quantity), not newest: this list is a restock to-do.
+  async listLowStock(
+    query: PaginationQueryDTO = {},
+  ): Promise<IPagination<InventoryStock & { minStockLevel: number }>> {
+    const window = pageWindow(query);
+    const [rows, total] = await this.stockRepository
       .createQueryBuilder('stock')
       .innerJoinAndSelect('stock.item', 'item')
       .innerJoinAndSelect('stock.store', 'store')
       .where('stock.quantity <= item.minStockLevel')
       .orderBy('stock.quantity', 'ASC')
-      .getMany();
-    return rows.map((r) => Object.assign(r, { minStockLevel: r.item.minStockLevel }));
+      .addOrderBy('item.name', 'ASC')
+      .addOrderBy('stock.id', 'ASC')
+      .skip(window.skip)
+      .take(window.take)
+      .getManyAndCount();
+    const items = rows.map((r) =>
+      Object.assign(r, { minStockLevel: r.item.minStockLevel }),
+    );
+    return toPage(items, total, window);
   }
 
   private async applyStockChange(

@@ -25,6 +25,7 @@ import { UpdateLabOrderDto } from './dto/update-lab-order.dto';
 import { UpdateLabTestDto } from './dto/update-lab-test.dto';
 import { LabOrdersService } from './lab-orders.service';
 import { LabTestsService } from './lab-tests.service';
+import { PaginationQueryDTO } from 'common/pagination';
 
 @Controller('lab')
 export class LabController {
@@ -83,8 +84,11 @@ export class LabController {
 
   @Get('orders/patient/:patientId')
   @Roles(RoleGroups.CLINICAL_STAFF)
-  findOrdersByPatient(@Param('patientId', ParseUUIDPipe) patientId: string) {
-    return this.labOrdersService.findByPatient(patientId);
+  findOrdersByPatient(
+    @Param('patientId', ParseUUIDPipe) patientId: string,
+    @Query() query: PaginationQueryDTO,
+  ) {
+    return this.labOrdersService.findByPatient(patientId, query);
   }
 
   @Get('orders/consultation/:consultationId')

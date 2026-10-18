@@ -7,7 +7,8 @@ import {
   MoreThanOrEqual,
   Repository,
 } from 'typeorm';
-import { buildPaginationMeta, IPagination } from 'common/response-format';
+import { IPagination } from 'common/response-format';
+import { pageWindow, toPage } from 'common/pagination';
 import { AuditLogQueryDTO } from './dto/audit-log-query.dto';
 import { AuditLog } from './entities/audit-log.entity';
 
@@ -20,15 +21,15 @@ export class AuditLogsService {
   ) {}
 
   async search(query: AuditLogQueryDTO): Promise<IPagination<AuditLog>> {
-    const { page = 1, limit = 20, sortOrder = 'DESC' } = query;
-    const skip = (page - 1) * limit;
+    const window = pageWindow(query);
+    const sortOrder = query.sortOrder ?? 'DESC';
     const [items, total] = await this.auditLogs.findAndCount({
       where: this.buildWhere(query),
-      order: { createdAt: sortOrder },
-      skip,
-      take: limit,
+      order: { createdAt: sortOrder, id: sortOrder },
+      skip: window.skip,
+      take: window.take,
     });
-    return { items, total, meta: buildPaginationMeta(total, skip, limit) };
+    return toPage(items, total, window);
   }
 
   private buildWhere(query: AuditLogQueryDTO): FindOptionsWhere<AuditLog> {

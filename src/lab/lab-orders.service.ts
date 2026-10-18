@@ -28,6 +28,7 @@ import { LabOrderCreatedEvent } from './events/lab-order-created.event';
 import { LabOrderCompletedEvent } from './events/lab-order-completed.event';
 import { LabOrderCancelledEvent } from './events/lab-order-cancelled.event';
 import { LabResultReadyEvent } from './events/lab-result-ready.event';
+import { PaginationQueryDTO, pageWindow, toPage } from 'common/pagination';
 
 @Injectable()
 export class LabOrdersService extends BaseCrudService<LabOrder> {
@@ -130,8 +131,7 @@ export class LabOrdersService extends BaseCrudService<LabOrder> {
   }
 
   async search(query: QueryLabOrdersDto): Promise<IPagination<LabOrder>> {
-    const page = query.page ?? 1;
-    const limit = query.limit ?? 20;
+    const window = pageWindow(query);
     const sortOrder = query.sortOrder ?? 'DESC';
 
     const qb = this.labOrdersRepository
@@ -149,20 +149,29 @@ export class LabOrdersService extends BaseCrudService<LabOrder> {
 
     const [items, total] = await qb
       .orderBy('order.createdAt', sortOrder)
-      .skip((page - 1) * limit)
-      .take(limit)
+      // Tie-break on id so rows never repeat or vanish between pages.
+      .addOrderBy('order.id', sortOrder)
+      .skip(window.skip)
+      .take(window.take)
       .getManyAndCount();
 
-    return { items, total };
+    return toPage(items, total, window);
   }
 
-  async findByPatient(patientId: string): Promise<LabOrder[]> {
+  // Patient history grows for years, so it is paged newest-first like every other list.
+  async findByPatient(
+    patientId: string,
+    query: PaginationQueryDTO = {},
+  ): Promise<IPagination<LabOrder>> {
     await this.patientsService.findOne(patientId);
-    return this.labOrdersRepository.find({
-      where: { patientId },
-      relations: { items: { test: true } },
-      order: { createdAt: 'DESC' },
-    });
+    return this.findPage(
+      {
+        where: { patientId },
+        relations: { items: { test: true } },
+        order: { createdAt: 'DESC', id: 'DESC' },
+      },
+      query,
+    );
   }
 
   async findByConsultation(consultationId: string): Promise<LabOrder[]> {
