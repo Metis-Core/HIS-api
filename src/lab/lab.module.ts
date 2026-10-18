@@ -1,4 +1,12 @@
 import { Module } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { MulterModule } from '@nestjs/platform-express';
+import { DiskFileStorage } from 'common/storage/disk-file-storage';
+import { FileStorage } from 'common/storage/file-storage';
+import { attachmentUploadOptions } from './attachments/attachment-upload.options';
+import { LabAttachment } from './attachments/lab-attachment.entity';
+import { LabAttachmentsController } from './attachments/lab-attachments.controller';
+import { LabAttachmentsService } from './attachments/lab-attachments.service';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { NotificationsModule } from 'src/notifications/notifications.module';
 import { PatientsModule } from 'src/patients/patients.module';
@@ -26,13 +34,23 @@ import { LabTestsService } from './lab-tests.service';
       LabOrder,
       LabOrderItem,
       LabResultAmendment,
+      LabAttachment,
     ]),
+    MulterModule.registerAsync({
+      inject: [ConfigService],
+      useFactory: attachmentUploadOptions,
+    }),
     PatientsModule,
     UsersModule,
     NotificationsModule,
     QueueModule,
   ],
-  controllers: [LabController, LabResultsController, LabBoardController],
+  controllers: [
+    LabController,
+    LabResultsController,
+    LabBoardController,
+    LabAttachmentsController,
+  ],
   providers: [
     LabTestsService,
     LabOrdersService,
@@ -41,6 +59,8 @@ import { LabTestsService } from './lab-tests.service';
     LabOrderProgressService,
     LabAmendmentsService,
     LabBoardService,
+    LabAttachmentsService,
+    { provide: FileStorage, useClass: DiskFileStorage },
   ],
   exports: [LabTestsService, LabOrdersService, LabOrderIntakeService],
 })

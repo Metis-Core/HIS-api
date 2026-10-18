@@ -92,6 +92,17 @@ export class EnvironmentVariablesDTO {
   @IsString()
   JWT_ACCESS_EXPIRES_IN?: string;
 
+  // Persistent, backed-up folder outside the deploy directory for lab attachments (L8).
+  @IsOptional()
+  @IsString()
+  ATTACHMENTS_DIR?: string;
+
+  @IsOptional()
+  @IsInt({ message: 'ATTACHMENT_MAX_BYTES must be an integer' })
+  @Min(1024)
+  @Max(50 * 1024 * 1024)
+  ATTACHMENT_MAX_BYTES?: number;
+
   @IsOptional()
   @IsString()
   JWT_REFRESH_EXPIRES_IN?: string;
