@@ -1,9 +1,15 @@
 import { Transform } from 'class-transformer';
-import { IsBoolean, IsEnum, IsOptional, IsString, MaxLength } from 'class-validator';
-import { BaseFilterDTO } from 'common/dto/filter.dto';
+import {
+  IsBoolean,
+  IsEnum,
+  IsOptional,
+  IsString,
+  MaxLength,
+} from 'class-validator';
+import { CatalogueFilterDTO } from 'common/dto/catalogue-filter.dto';
 import { InventoryItemType } from '../enums/inventory-item-type.enum';
 
-export class QueryInventoryItemsDto extends BaseFilterDTO {
+export class QueryInventoryItemsDto extends CatalogueFilterDTO {
   @IsOptional()
   @IsString()
   @MaxLength(64)
@@ -14,7 +20,9 @@ export class QueryInventoryItemsDto extends BaseFilterDTO {
   type?: InventoryItemType;
 
   @IsOptional()
-  @Transform(({ value }) => (value === 'false' ? false : value === 'true' ? true : value))
+  @Transform(({ value }) =>
+    value === 'false' ? false : value === 'true' ? true : value,
+  )
   @IsBoolean()
   isActive?: boolean;
 }

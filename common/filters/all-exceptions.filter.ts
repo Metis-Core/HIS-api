@@ -8,6 +8,7 @@ import {
 } from '@nestjs/common';
 import type { Response } from 'express';
 import { QueryFailedError } from 'typeorm';
+import { RequestContext } from 'core/request-context/request-context';
 import { ApiErrorBody, formatErrorResponse } from 'common/response-format';
 
 interface ResolvedError {
@@ -92,7 +93,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
       // Log the class and message only; SQL parameters can carry patient data.
       const err = exception as Error;
       this.logger.error(
-        `${err?.name ?? 'Error'}: ${err?.message ?? String(exception)}`,
+        `[${RequestContext.getCorrelationId() ?? '-'}] ${err?.name ?? 'Error'}: ${err?.message ?? String(exception)}`,
         err?.stack,
       );
     }

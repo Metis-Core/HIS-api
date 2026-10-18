@@ -4,10 +4,12 @@ import {
   Delete,
   Get,
   Param,
+  Patch,
   ParseEnumPipe,
   ParseUUIDPipe,
   Post,
   Put,
+  Query,
   UsePipes,
   ValidationPipe,
 } from '@nestjs/common';
@@ -21,6 +23,10 @@ import { VisitsService } from './visit.service';
 import { formatResponse } from '../../common/response-format';
 import { CreateVisitDTO } from './dto/create-visit.dto';
 import { UpdateVisitDTO } from './dto/update-visit.dto';
+import { AppendIntentsDTO } from './dto/append-intents.dto';
+import { ChangePriorityDTO } from './dto/change-priority.dto';
+import { assertCanRouteClinically } from './journey/assert-can-route';
+import { QueryVisitsDTO } from './dto/query-visits.dto';
 
 @Controller('visits')
 export class VisitController {
@@ -31,11 +37,8 @@ export class VisitController {
 
   @Get()
   @Roles(RoleGroups.FLOOR_STAFF)
-  async getAllVisits() {
-    const visits = await this.visitService.findManyWithPagination({
-      relations: { queueEntries: true },
-    });
-    return formatResponse(visits);
+  async getAllVisits(@Query() query: QueryVisitsDTO) {
+    return formatResponse(await this.visitService.search(query));
   }
 
   @Get('/queues')
@@ -43,6 +46,7 @@ export class VisitController {
   async getQueues() {
     const visits = await this.visitService.findManyWithPagination({
       relations: { queueEntries: true, patient: true },
+      order: { createdAt: 'DESC', queueEntries: { sequenceNumber: 'ASC' } },
       take: 100,
     });
     return formatResponse(visits);
@@ -70,7 +74,7 @@ export class VisitController {
     @Param('id', ParseUUIDPipe) id: string,
     @CurrentUser() user: AuthenticatedUser,
   ) {
-    const entry = await this.queueEntries.call(id, user.id);
+    const entry = await this.queueEntries.call(id, user);
     return formatResponse(entry);
   }
 
@@ -80,7 +84,7 @@ export class VisitController {
     @Param('id', ParseUUIDPipe) id: string,
     @CurrentUser() user: AuthenticatedUser,
   ) {
-    const entry = await this.queueEntries.start(id, user.id);
+    const entry = await this.queueEntries.start(id, user);
     return formatResponse(entry);
   }
 
@@ -88,9 +92,10 @@ export class VisitController {
   @Roles(RoleGroups.FLOOR_STAFF)
   async completeEntry(
     @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() user: AuthenticatedUser,
     @Body('notes') notes?: string,
   ) {
-    const result = await this.queueEntries.complete(id, notes);
+    const result = await this.queueEntries.complete(id, notes, user);
     return formatResponse(result);
   }
 
@@ -98,9 +103,10 @@ export class VisitController {
   @Roles(RoleGroups.FLOOR_STAFF)
   async skipEntry(
     @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() user: AuthenticatedUser,
     @Body('notes') notes?: string,
   ) {
-    const result = await this.queueEntries.skip(id, notes);
+    const result = await this.queueEntries.skip(id, notes, user);
     return formatResponse(result);
   }
 
@@ -112,14 +118,16 @@ export class VisitController {
   }
 
   @Post('/queue/visit/:visitId/append')
-  @Roles(RoleGroups.PROVIDERS)
+  @Roles(RoleGroups.CLINICAL_ROUTERS)
   async appendVisitIntents(
     @Param('visitId', ParseUUIDPipe) visitId: string,
-    @Body('intents') intents: string[],
+    @Body() body: AppendIntentsDTO,
+    @CurrentUser() user: AuthenticatedUser,
   ) {
-    const created = await this.queueEntries.appendIntents(
+    assertCanRouteClinically(user.role);
+    const created = await this.queueEntries.routeFromDoctor(
       visitId,
-      (intents ?? []) as any,
+      body.intents,
     );
     return formatResponse(created);
   }
@@ -136,6 +144,28 @@ export class VisitController {
       handler: user.id,
     });
     return formatResponse(visit);
+  }
+
+  @Patch(':id/priority')
+  @Roles(RoleGroups.PRIORITY_MANAGERS)
+  async changePriority(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: ChangePriorityDTO,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    const visit = await this.visitService.changePriority(
+      id,
+      body.triageCategory,
+      body.reason,
+      user.id,
+    );
+    return formatResponse(visit);
+  }
+
+  @Get(':id/timeline')
+  @Roles(RoleGroups.FLOOR_STAFF)
+  async getVisitTimeline(@Param('id', ParseUUIDPipe) id: string) {
+    return formatResponse(await this.visitService.timeline(id));
   }
 
   @Get(':id')

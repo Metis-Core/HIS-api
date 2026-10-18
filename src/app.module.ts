@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
-import { APP_FILTER, APP_GUARD } from '@nestjs/core';
+import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
+import { RequestContextInterceptor } from 'core/request-context/request-context.interceptor';
 import { AllExceptionsFilter } from 'common/filters/all-exceptions.filter';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { DatabaseModule } from 'core/database/database.module';
@@ -9,7 +10,7 @@ import { RolesGuard } from 'core/guards/roles.guard';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AnalyticsModule } from './analytics/analytics.module';
-import { AuditlogsModule } from './auditLogs/auditlogs.module';
+import { AuditLogsModule } from './auditLogs/audit-logs.module';
 import { AuthModule } from './auth/auth.module';
 import { ConsultationModule } from './consultation/consultation.module';
 import { ContactsModule } from './contacts/contacts.module';
@@ -38,7 +39,7 @@ import { DocumentsModule } from './documents/documents.module';
     PaymentsModule,
     LabModule,
     PatientsModule,
-    AuditlogsModule,
+    AuditLogsModule,
     InventoryModule,
     AnalyticsModule,
     TraigeModule,
@@ -55,6 +56,7 @@ import { DocumentsModule } from './documents/documents.module';
     { provide: APP_FILTER, useClass: AllExceptionsFilter },
     { provide: APP_GUARD, useClass: JwtAuthGuard },
     { provide: APP_GUARD, useClass: RolesGuard },
+    { provide: APP_INTERCEPTOR, useClass: RequestContextInterceptor },
   ],
 })
 export class AppModule {}

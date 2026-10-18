@@ -43,14 +43,7 @@ export class UsersService extends BaseCrudService<User> {
   }
 
   async search(query: QueryUsersDto): Promise<IPagination<User>> {
-    const {
-      page = 1,
-      limit = 20,
-      sortOrder = 'DESC',
-      role,
-      department,
-      status,
-    } = query;
+    const { sortOrder = 'DESC', role, department, status } = query;
     const base: FindOptionsWhere<User> = {
       ...(role ? { role } : {}),
       ...(department ? { department } : {}),
@@ -64,12 +57,10 @@ export class UsersService extends BaseCrudService<User> {
         ]
       : base;
 
-    return this.findManyWithPagination({
-      where,
-      order: { createdAt: sortOrder },
-      skip: (page - 1) * limit,
-      take: limit,
-    });
+    return this.findPage(
+      { where, order: { createdAt: sortOrder, id: sortOrder } },
+      query,
+    );
   }
 
   async findById(id: string): Promise<User | null> {
@@ -155,6 +146,28 @@ export class UsersService extends BaseCrudService<User> {
       user.status = AccountStatus.ACTIVE;
     }
     await this.usersRepository.save(user);
+  }
+
+  async updateOwnProfile(
+    userId: string,
+    changes: { username: string; currentPassword: string },
+  ): Promise<User> {
+    const { username } = changes;
+    const user = await this.usersRepository
+      .createQueryBuilder('user')
+      .addSelect('user.passwordHash')
+      .where('user.id = :userId', { userId })
+      .getOne();
+    if (!user || !(await this.verifyPassword(user, changes.currentPassword))) {
+      throw new BadRequestException('Current password is incorrect');
+    }
+    const clash = await this.usersRepository.findOne({ where: { username } });
+    if (clash && clash.id !== userId) {
+      throw new ConflictException('Username already in use');
+    }
+    user.username = username;
+    await this.usersRepository.save(user);
+    return this.findOne(userId);
   }
 
   assertAccountUsable(user: User): void {

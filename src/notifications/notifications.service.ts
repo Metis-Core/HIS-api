@@ -10,6 +10,7 @@ import { UpdateNotificationDto } from './dto/update-notification.dto';
 import { Notification } from './entities/notification.entity';
 import { NotificationStatus } from './enums/notification-status.enum';
 import { NotificationCreatedEvent } from './events/notification-created.event';
+import { pageWindow, toPage } from 'common/pagination';
 
 @Injectable()
 export class NotificationsService extends BaseCrudService<Notification> {
@@ -43,22 +44,28 @@ export class NotificationsService extends BaseCrudService<Notification> {
   }
 
   async search(query: QueryNotificationsDto): Promise<IPagination<Notification>> {
-    const page = query.page ?? 1;
-    const limit = query.limit ?? 20;
+    const window = pageWindow(query);
     const sortOrder = query.sortOrder ?? 'DESC';
 
     const qb = this.notificationsRepository.createQueryBuilder('notification');
     if (query.userId) qb.andWhere('notification.userId = :userId', { userId: query.userId });
     if (query.status) qb.andWhere('notification.status = :status', { status: query.status });
     if (query.type) qb.andWhere('notification.type = :type', { type: query.type });
+    if (query.priority) {
+      qb.andWhere('notification.priority = :priority', {
+        priority: query.priority,
+      });
+    }
 
     const [items, total] = await qb
       .orderBy('notification.createdAt', sortOrder)
-      .skip((page - 1) * limit)
-      .take(limit)
+      // Tie-break on id so rows never repeat or vanish between pages.
+      .addOrderBy('notification.id', sortOrder)
+      .skip(window.skip)
+      .take(window.take)
       .getManyAndCount();
 
-    return { items, total };
+    return toPage(items, total, window);
   }
 
   async findForUser(

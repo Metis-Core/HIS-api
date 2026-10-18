@@ -7,7 +7,8 @@ import {
   FindManyOptions,
 } from 'typeorm';
 import { BaseEntity } from '../entities/base.entity';
-import { buildPaginationMeta, IPagination } from '../response-format';
+import { IPagination } from '../response-format';
+import { DEFAULT_PAGE_SIZE, pageWindow, toPage } from '../pagination';
 
 @Injectable()
 export abstract class BaseCrudService<T extends BaseEntity> {
@@ -50,14 +51,27 @@ export abstract class BaseCrudService<T extends BaseEntity> {
   public async findManyWithPagination(
     options?: FindManyOptions<T>,
   ): Promise<IPagination<T>> {
+    const take = options?.take ? Number(options.take) : undefined;
     const skip = options?.skip ? Number(options.skip) : 0;
-    const take = options?.take ? Number(options.take) : 10;
+    const limit = take ?? DEFAULT_PAGE_SIZE;
+    return this.findPage(options ?? {}, {
+      page: Math.floor(skip / limit) + 1,
+      limit,
+    });
+  }
+
+  /** One page of rows in the standard IPagination shape; page/limit are clamped to safe bounds. */
+  public async findPage(
+    options: Omit<FindManyOptions<T>, 'skip' | 'take'>,
+    query: { page?: number; limit?: number } = {},
+  ): Promise<IPagination<T>> {
+    const window = pageWindow(query);
     const [items, total] = await this.repository.findAndCount({
       ...options,
-      skip,
-      take,
+      skip: window.skip,
+      take: window.take,
     });
-    return { items, total, meta: buildPaginationMeta(total, skip, take) };
+    return toPage(items, total, window);
   }
 
   async findOneByWhere(options: FindOneOptions<T>): Promise<T | undefined> {
@@ -68,16 +82,15 @@ export abstract class BaseCrudService<T extends BaseEntity> {
     return entity;
   }
 
+  // Entity-level save/remove (not query-builder writes) so subscribers such as the audit log see the change.
   async update(id: string, updateDto: DeepPartial<T>): Promise<T> {
-    await this.findOne(id);
-    await this.repository.update({ id } as any, updateDto as any);
+    const entity = await this.findOne(id);
+    await this.repository.save(this.repository.merge(entity, updateDto));
     return await this.findOne(id);
   }
 
   async remove(id: string): Promise<void> {
-    const result = await this.repository.delete(id);
-    if (result.affected === 0) {
-      throw new NotFoundException(`Entity with ID ${id} not found`);
-    }
+    const entity = await this.findOne(id);
+    await this.repository.remove(entity);
   }
 }

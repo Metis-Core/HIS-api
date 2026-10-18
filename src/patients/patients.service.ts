@@ -1,4 +1,9 @@
-import { ConflictException, Injectable } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import {
@@ -14,6 +19,7 @@ import { CreatePatientDto } from './dto/create-patient.dto';
 import { PatientFiltersDto } from './dto/patient-filters.dto';
 import { UpdatePatientDto } from './dto/update-patient.dto';
 import { Patient } from './entities/patient.entity';
+import { PatientScope, scopeCondition } from './patient-scope.policy';
 import {
   PatientCreatedEvent,
   PatientDeletedEvent,
@@ -24,7 +30,8 @@ import {
 } from './events/patient.events';
 import { ContactsService } from '../contacts/contacts.service';
 import { BaseCrudService } from '../../common/services/crud.service';
-import { buildPaginationMeta, IPagination } from '../../common/response-format';
+import { IPagination } from '../../common/response-format';
+import { pageWindow, toPage } from '../../common/pagination';
 import { containsPattern } from '../../common/utils/like-pattern';
 
 const SEARCHABLE_FIELDS = [
@@ -89,6 +96,7 @@ export class PatientsService extends BaseCrudService<Patient> {
   override async update(id: string, dto: UpdatePatientDto): Promise<Patient> {
     const existing = await this.findOne(id);
     const { emergencyContact, ...rest } = dto;
+    if (!emergencyContact) await this.assertHasNextOfKin(id);
     await super.update(id, rest);
     if (emergencyContact) {
       await this.contactService.upsertForPatient(id, emergencyContact);
@@ -108,29 +116,58 @@ export class PatientsService extends BaseCrudService<Patient> {
     return updated;
   }
 
+  // Legacy rows may lack a next of kin; any edit must add one (R2).
+  private async assertHasNextOfKin(id: string): Promise<void> {
+    const patient = await this.patientsRepository.findOne({
+      where: { id },
+      relations: { contact: true },
+    });
+    if (!patient?.contact) {
+      throw new BadRequestException(
+        'emergencyContact (next of kin) is required for this patient',
+      );
+    }
+  }
+
   // Clinical records are kept; deleting a patient only archives the row.
   override async remove(id: string): Promise<void> {
     const patient = await this.findOne(id);
-    await this.patientsRepository.softDelete(id);
+    await this.patientsRepository.softRemove(
+      await this.patientsRepository.findOneByOrFail({ id }),
+    );
     this.emit(new PatientDeletedEvent(toPatientEventData(patient)));
   }
 
-  async search(query: PatientFiltersDto): Promise<IPagination<Patient>> {
-    const {
-      page = 1,
-      limit = 20,
-      sortOrder = 'DESC',
-      search,
-      ...filters
-    } = query;
-    const skip = (page - 1) * limit;
+  /** Opens a patient only if it is inside the caller's scope; otherwise 404, so ids cannot be probed. */
+  async findOneInScope(id: string, scope: PatientScope): Promise<Patient> {
+    const qb = this.patientsRepository
+      .createQueryBuilder('patient')
+      .leftJoinAndSelect('patient.contact', 'contact')
+      .where('patient.id = :id', { id });
+    const condition = scopeCondition(scope);
+    if (condition) qb.andWhere(condition);
+    const patient = await qb.getOne();
+    if (!patient) throw new NotFoundException('Patient not found');
+    return patient;
+  }
+
+  async search(
+    query: PatientFiltersDto,
+    scope: PatientScope = PatientScope.ALL,
+  ): Promise<IPagination<Patient>> {
+    const { page, limit, sortOrder = 'DESC', search, ...filters } = query;
+    const window = pageWindow({ page, limit });
     const qb = this.patientsRepository
       .createQueryBuilder('patient')
       .leftJoinAndSelect('patient.contact', 'contact')
       .where(this.buildWhere(filters))
       .orderBy('patient.createdAt', sortOrder)
-      .skip(skip)
-      .take(limit);
+      .addOrderBy('patient.id', sortOrder)
+      .skip(window.skip)
+      .take(window.take);
+
+    const condition = scopeCondition(scope);
+    if (condition) qb.andWhere(condition);
 
     // Every word must match some identifying field, so "jane nakato" finds Jane Nakato.
     const words = search?.trim().split(/\s+/).filter(Boolean) ?? [];
@@ -148,7 +185,7 @@ export class PatientsService extends BaseCrudService<Patient> {
     });
 
     const [items, total] = await qb.getManyAndCount();
-    return { items, total, meta: buildPaginationMeta(total, skip, limit) };
+    return toPage(items, total, window);
   }
 
   private buildWhere(

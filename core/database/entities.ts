@@ -1,3 +1,4 @@
+import { AuditLog } from 'src/auditLogs/entities/audit-log.entity';
 import { AuthToken } from 'src/auth/entities/auth-token.entity';
 import { Consultation } from 'src/consultation/entities/consultation.entity';
 import { Contact } from 'src/contacts/entities/contact.entity';
@@ -46,4 +47,5 @@ export const entities = [
   Dispense,
   DispenseItem,
   VisitCharge,
+  AuditLog,
 ];

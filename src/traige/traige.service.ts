@@ -1,13 +1,12 @@
-import {
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { ConsciousnessLevel } from 'src/traige/enums/consciousness-level.enum';
 import { TriageStatus } from 'src/traige/enums/triage-status.enum';
 import { PatientsService } from 'src/patients/patients.service';
 import { QueueEntriesService } from 'src/queue/queue-entries.service';
+import { VisitsService } from 'src/queue/visit.service';
+import { categoryForAcuity } from 'src/queue/journey/visit-priority';
 import { UsersService } from 'src/users/users.service';
 import { Department } from 'common/enums/department.enum';
 import { VisitIntenentsEnum } from 'src/queue/enums/visit-type.enum';
@@ -16,6 +15,8 @@ import { CreateTriageDto } from './dto/create-traige.dto';
 import { QueryTriageDto } from './dto/query-triage.dto';
 import { UpdateTriageDto } from './dto/update-traige.dto';
 import { Triage } from './entities/traige.entity';
+import { IPagination } from 'common/response-format';
+import { PaginationQueryDTO, pageWindow, toPage } from 'common/pagination';
 
 @Injectable()
 export class TraigeService extends BaseCrudService<Triage> {
@@ -25,6 +26,7 @@ export class TraigeService extends BaseCrudService<Triage> {
     private readonly patientsService: PatientsService,
     private readonly usersService: UsersService,
     private readonly queueEntries: QueueEntriesService,
+    private readonly visits: VisitsService,
   ) {
     super(triageRepository);
   }
@@ -70,7 +72,6 @@ export class TraigeService extends BaseCrudService<Triage> {
       heightCm: dto.heightCm !== undefined ? String(dto.heightCm) : null,
       painScore: dto.painScore ?? null,
       allergiesNoted: dto.allergiesNoted?.trim() ?? null,
-      referredToDepartment: dto.referredToDepartment ?? null,
       arrivedAt: dto.arrivedAt ? new Date(dto.arrivedAt) : now,
       triagedAt: dto.triagedAt ? new Date(dto.triagedAt) : now,
       completedAt: null,
@@ -81,6 +82,10 @@ export class TraigeService extends BaseCrudService<Triage> {
     const triageRecord = await this.findOne(saved.id);
 
     if (dto.visitId) {
+      await this.visits.raiseCategory(
+        dto.visitId,
+        categoryForAcuity(triageRecord.acuity),
+      );
       if (
         triageRecord.status === TriageStatus.COMPLETED ||
         triageRecord.status === TriageStatus.REFERRED
@@ -92,14 +97,8 @@ export class TraigeService extends BaseCrudService<Triage> {
     return triageRecord;
   }
 
-  async search(query: QueryTriageDto): Promise<{
-    items: Triage[];
-    total: number;
-    page: number;
-    limit: number;
-  }> {
-    const page = query.page ?? 1;
-    const limit = query.limit ?? 20;
+  async search(query: QueryTriageDto): Promise<IPagination<Triage>> {
+    const window = pageWindow(query);
     const sortBy = query.sortBy ?? 'createdAt';
     const sortOrder = query.sortOrder ?? 'DESC';
 
@@ -163,23 +162,33 @@ export class TraigeService extends BaseCrudService<Triage> {
     }
 
     qb.orderBy(`triage.${sortBy}`, sortOrder)
-      .skip((page - 1) * limit)
-      .take(limit);
+      .addOrderBy('triage.id', sortOrder)
+      .skip(window.skip)
+      .take(window.take);
 
     const [items, total] = await qb.getManyAndCount();
-    return { items, total, page, limit };
+    return toPage(items, total, window);
   }
 
-  async findByPatient(patientId: string): Promise<Triage[]> {
+  // Patient history grows for years, so it is paged newest-first like every other list.
+  async findByPatient(
+    patientId: string,
+    query: PaginationQueryDTO = {},
+  ): Promise<IPagination<Triage>> {
     await this.patientsService.findOne(patientId);
-    return this.triageRepository.find({
-      where: { patientId },
-      order: { createdAt: 'DESC' },
-      relations: { patient: true },
-    });
+    return this.findPage(
+      {
+        where: { patientId },
+        relations: { patient: true },
+        order: { createdAt: 'DESC', id: 'DESC' },
+      },
+      query,
+    );
   }
 
-  async findQueue(status: TriageStatus = TriageStatus.WAITING): Promise<Triage[]> {
+  async findQueue(
+    status: TriageStatus = TriageStatus.WAITING,
+  ): Promise<Triage[]> {
     return this.triageRepository
       .createQueryBuilder('triage')
       .leftJoinAndSelect('triage.patient', 'patient')
@@ -268,9 +277,6 @@ export class TraigeService extends BaseCrudService<Triage> {
     if (dto.allergiesNoted !== undefined) {
       triage.allergiesNoted = dto.allergiesNoted?.trim() || null;
     }
-    if (dto.referredToDepartment !== undefined) {
-      triage.referredToDepartment = dto.referredToDepartment;
-    }
     if (dto.arrivedAt !== undefined) {
       triage.arrivedAt = new Date(dto.arrivedAt);
     }
@@ -288,6 +294,10 @@ export class TraigeService extends BaseCrudService<Triage> {
     const updated = await this.findOne(id);
 
     if (dto.visitId) {
+      await this.visits.raiseCategory(
+        dto.visitId,
+        categoryForAcuity(updated.acuity),
+      );
       if (
         updated.status === TriageStatus.COMPLETED ||
         updated.status === TriageStatus.REFERRED
@@ -306,8 +316,12 @@ export class TraigeService extends BaseCrudService<Triage> {
     return this.triageRepository.save(triage);
   }
 
+  // Triage can only recommend the doctor's consultation; further routing is the doctor's (R6).
   private async syncVisitQueue(visitId: string, triage: Triage): Promise<void> {
     await this.queueEntries.completeCurrentFor(visitId, Department.TRIAGE);
-    await this.queueEntries.ensureIntent(visitId, VisitIntenentsEnum.CONSULTATION);
+    await this.queueEntries.ensureIntent(
+      visitId,
+      VisitIntenentsEnum.CONSULTATION,
+    );
   }
 }

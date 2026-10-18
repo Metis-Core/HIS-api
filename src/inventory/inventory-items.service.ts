@@ -7,6 +7,7 @@ import { CreateInventoryItemDto } from './dto/create-inventory-item.dto';
 import { QueryInventoryItemsDto } from './dto/query-inventory-items.dto';
 import { UpdateInventoryItemDto } from './dto/update-inventory-item.dto';
 import { InventoryItem } from './entities/inventory-item.entity';
+import { pageWindow, toPage } from 'common/pagination';
 
 @Injectable()
 export class InventoryItemsService extends BaseCrudService<InventoryItem> {
@@ -27,8 +28,7 @@ export class InventoryItemsService extends BaseCrudService<InventoryItem> {
   }
 
   async search(query: QueryInventoryItemsDto): Promise<IPagination<InventoryItem>> {
-    const page = query.page ?? 1;
-    const limit = query.limit ?? 20;
+    const window = pageWindow(query);
     const sortOrder = query.sortOrder ?? 'ASC';
 
     const qb = this.itemsRepository.createQueryBuilder('item');
@@ -41,11 +41,13 @@ export class InventoryItemsService extends BaseCrudService<InventoryItem> {
 
     const [items, total] = await qb
       .orderBy('item.name', sortOrder)
-      .skip((page - 1) * limit)
-      .take(limit)
+      // Tie-break on id so rows never repeat or vanish between pages.
+      .addOrderBy('item.id', sortOrder)
+      .skip(window.skip)
+      .take(window.take)
       .getManyAndCount();
 
-    return { items, total };
+    return toPage(items, total, window);
   }
 
   override async update(id: string, dto: UpdateInventoryItemDto): Promise<InventoryItem> {

@@ -29,6 +29,8 @@ import { PrescriptionItemStatus } from './enums/prescription-item-status.enum';
 import { PrescriptionStatus } from './enums/prescription-status.enum';
 import { PrescriptionDispensedEvent } from './events/prescription-dispensed.event';
 import { PrescriptionCreatedEvent } from './events/prescription-created.event';
+import { PaginationQueryDTO, pageWindow, toPage } from 'common/pagination';
+import { wherePatientMatches } from 'common/utils/query-list';
 
 @Injectable()
 export class PharmacyService extends BaseCrudService<Prescription> {
@@ -132,8 +134,7 @@ export class PharmacyService extends BaseCrudService<Prescription> {
   }
 
   async search(query: QueryPrescriptionsDto): Promise<IPagination<Prescription>> {
-    const page = query.page ?? 1;
-    const limit = query.limit ?? 20;
+    const window = pageWindow(query);
     const sortOrder = query.sortOrder ?? 'DESC';
 
     const qb = this.prescriptionsRepository
@@ -145,24 +146,34 @@ export class PharmacyService extends BaseCrudService<Prescription> {
     if (query.patientId) qb.andWhere('prescription.patientId = :patientId', { patientId: query.patientId });
     if (query.consultationId) qb.andWhere('prescription.consultationId = :consultationId', { consultationId: query.consultationId });
     if (query.prescribedById) qb.andWhere('prescription.prescribedById = :prescribedById', { prescribedById: query.prescribedById });
-    if (query.status) qb.andWhere('prescription.status = :status', { status: query.status });
+    if (query.status?.length) qb.andWhere('prescription.status IN (:...statuses)', { statuses: query.status });
+    wherePatientMatches(qb, 'patient', query.search);
 
     const [items, total] = await qb
       .orderBy('prescription.createdAt', sortOrder)
-      .skip((page - 1) * limit)
-      .take(limit)
+      // Tie-break on id so rows never repeat or vanish between pages.
+      .addOrderBy('prescription.id', sortOrder)
+      .skip(window.skip)
+      .take(window.take)
       .getManyAndCount();
 
-    return { items, total };
+    return toPage(items, total, window);
   }
 
-  async findByPatient(patientId: string): Promise<Prescription[]> {
+  // Patient history grows for years, so it is paged newest-first like every other list.
+  async findByPatient(
+    patientId: string,
+    query: PaginationQueryDTO = {},
+  ): Promise<IPagination<Prescription>> {
     await this.patientsService.findOne(patientId);
-    return this.prescriptionsRepository.find({
-      where: { patientId },
-      relations: { items: { item: true } },
-      order: { createdAt: 'DESC' },
-    });
+    return this.findPage(
+      {
+        where: { patientId },
+        relations: { items: { item: true } },
+        order: { createdAt: 'DESC', id: 'DESC' },
+      },
+      query,
+    );
   }
 
   async cancelPrescription(id: string, reason?: string): Promise<Prescription> {

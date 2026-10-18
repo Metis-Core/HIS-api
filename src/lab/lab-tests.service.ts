@@ -7,6 +7,7 @@ import { CreateLabTestDto } from './dto/create-lab-test.dto';
 import { QueryLabTestsDto } from './dto/query-lab-tests.dto';
 import { UpdateLabTestDto } from './dto/update-lab-test.dto';
 import { LabTest } from './entities/lab-test.entity';
+import { pageWindow, toPage } from 'common/pagination';
 
 @Injectable()
 export class LabTestsService extends BaseCrudService<LabTest> {
@@ -27,8 +28,7 @@ export class LabTestsService extends BaseCrudService<LabTest> {
   }
 
   async search(query: QueryLabTestsDto): Promise<IPagination<LabTest>> {
-    const page = query.page ?? 1;
-    const limit = query.limit ?? 20;
+    const window = pageWindow(query);
     const sortOrder = query.sortOrder ?? 'ASC';
 
     const qb = this.labTestsRepository.createQueryBuilder('test');
@@ -42,11 +42,13 @@ export class LabTestsService extends BaseCrudService<LabTest> {
 
     const [items, total] = await qb
       .orderBy('test.name', sortOrder)
-      .skip((page - 1) * limit)
-      .take(limit)
+      // Tie-break on id so rows never repeat or vanish between pages.
+      .addOrderBy('test.id', sortOrder)
+      .skip(window.skip)
+      .take(window.take)
       .getManyAndCount();
 
-    return { items, total };
+    return toPage(items, total, window);
   }
 
   override async update(id: string, dto: UpdateLabTestDto): Promise<LabTest> {

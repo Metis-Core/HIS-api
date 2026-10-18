@@ -25,6 +25,7 @@ import { CompleteConsultationDto } from './dto/complete-consultation.dto';
 import { CreateConsultationDto } from './dto/create-consultation.dto';
 import { QueryConsultationsDto } from './dto/query-consultations.dto';
 import { UpdateConsultationDto } from './dto/update-consultation.dto';
+import { PaginationQueryDTO } from 'common/pagination';
 
 @Controller('consultations')
 export class ConsultationController {
@@ -52,8 +53,11 @@ export class ConsultationController {
 
   @Get('patient/:patientId')
   @Roles(RoleGroups.CLINICAL_STAFF)
-  findByPatient(@Param('patientId', ParseUUIDPipe) patientId: string) {
-    return this.consultationService.findByPatient(patientId);
+  findByPatient(
+    @Param('patientId', ParseUUIDPipe) patientId: string,
+    @Query() query: PaginationQueryDTO,
+  ) {
+    return this.consultationService.findByPatient(patientId, query);
   }
 
   @Get('visit/:visitId')
@@ -91,8 +95,9 @@ export class ConsultationController {
   complete(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: CompleteConsultationDto,
+    @CurrentUser() user: AuthenticatedUser,
   ) {
-    return this.consultationService.complete(id, dto);
+    return this.consultationService.complete(id, dto, user.role);
   }
 
   @Post(':id/cancel')
@@ -115,7 +120,8 @@ export class ConsultationController {
   @HttpCode(HttpStatus.CREATED)
   async createLabOrder(
     @Param('id', ParseUUIDPipe) id: string,
-    @Body() dto: Omit<CreateLabOrderDto, 'consultationId' | 'patientId'> & {
+    @Body()
+    dto: Omit<CreateLabOrderDto, 'consultationId' | 'patientId'> & {
       patientId?: string;
     },
     @CurrentUser() user: AuthenticatedUser,
@@ -137,7 +143,8 @@ export class ConsultationController {
   @HttpCode(HttpStatus.CREATED)
   async createPrescription(
     @Param('id', ParseUUIDPipe) id: string,
-    @Body() dto: Omit<CreatePrescriptionDto, 'consultationId' | 'patientId'> & {
+    @Body()
+    dto: Omit<CreatePrescriptionDto, 'consultationId' | 'patientId'> & {
       patientId?: string;
     },
     @CurrentUser() user: AuthenticatedUser,

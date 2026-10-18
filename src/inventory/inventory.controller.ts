@@ -27,6 +27,9 @@ import { InventoryItemsService } from './inventory-items.service';
 import { InventoryStockService } from './inventory-stock.service';
 import { InventoryStoresService } from './inventory-stores.service';
 import { InventoryTransactionType } from './enums/inventoryTransactionType.enum';
+import { CatalogueFilterDTO } from 'common/dto/catalogue-filter.dto';
+import { PaginationQueryDTO } from 'common/pagination';
+import { QueryInventoryStockDTO } from './dto/query-inventory-stock.dto';
 
 @Controller('inventory')
 export class InventoryController {
@@ -94,8 +97,8 @@ export class InventoryController {
   }
 
   @Get('stores')
-  findAllStores() {
-    return this.storesService.findAll();
+  findAllStores(@Query() query: CatalogueFilterDTO) {
+    return this.storesService.search(query);
   }
 
   @Get('stores/active')
@@ -124,13 +127,13 @@ export class InventoryController {
   }
 
   @Get('stock')
-  listStock(@Query('storeId') storeId?: string) {
-    return this.stockService.getStockLevels(storeId);
+  listStock(@Query() query: QueryInventoryStockDTO) {
+    return this.stockService.getStockLevels(query);
   }
 
   @Get('stock/low')
-  listLowStock() {
-    return this.stockService.listLowStock();
+  listLowStock(@Query() query: PaginationQueryDTO) {
+    return this.stockService.listLowStock(query);
   }
 
   @Get('stock/:storeId/:itemId')

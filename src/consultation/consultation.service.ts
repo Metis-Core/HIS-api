@@ -19,6 +19,10 @@ import { Consultation } from './entities/consultation.entity';
 import { ConsultationStatus } from './enums/consultation-status.enum';
 import { ConsultationType } from './enums/consultation-type.enum';
 import { BaseCrudService } from '../../common/services/crud.service';
+import { UserRole } from 'common/enums/userRoles.enum';
+import { assertCanRouteClinically } from 'src/queue/journey/assert-can-route';
+import { IPagination } from 'common/response-format';
+import { PaginationQueryDTO, pageWindow, toPage } from 'common/pagination';
 
 @Injectable()
 export class ConsultationService extends BaseCrudService<Consultation> {
@@ -78,22 +82,17 @@ export class ConsultationService extends BaseCrudService<Consultation> {
       notes: dto.notes?.trim() ?? null,
       followUpDate: dto.followUpDate ?? null,
       startedAt: dto.startedAt ? new Date(dto.startedAt) : now,
-      completedAt:
-        dto.status === ConsultationStatus.COMPLETED ? now : null,
+      completedAt: dto.status === ConsultationStatus.COMPLETED ? now : null,
     });
 
     const saved = await this.consultationsRepository.save(consultation);
     return this.findOne(saved.id);
   }
 
-  async search(query: QueryConsultationsDto): Promise<{
-    items: Consultation[];
-    total: number;
-    page: number;
-    limit: number;
-  }> {
-    const page = query.page ?? 1;
-    const limit = query.limit ?? 20;
+  async search(
+    query: QueryConsultationsDto,
+  ): Promise<IPagination<Consultation>> {
+    const window = pageWindow(query);
     const sortBy = query.sortBy ?? 'createdAt';
     const sortOrder = query.sortOrder ?? 'DESC';
 
@@ -169,11 +168,12 @@ export class ConsultationService extends BaseCrudService<Consultation> {
     }
 
     qb.orderBy(`consultation.${sortBy}`, sortOrder)
-      .skip((page - 1) * limit)
-      .take(limit);
+      .addOrderBy('consultation.id', sortOrder)
+      .skip(window.skip)
+      .take(window.take);
 
     const [items, total] = await qb.getManyAndCount();
-    return { items, total, page, limit };
+    return toPage(items, total, window);
   }
 
   override async findOne(id: string): Promise<Consultation> {
@@ -192,13 +192,20 @@ export class ConsultationService extends BaseCrudService<Consultation> {
     return consultation;
   }
 
-  async findByPatient(patientId: string): Promise<Consultation[]> {
+  // Patient history grows for years, so it is paged newest-first like every other list.
+  async findByPatient(
+    patientId: string,
+    query: PaginationQueryDTO = {},
+  ): Promise<IPagination<Consultation>> {
     await this.patientsService.findOne(patientId);
-    return this.consultationsRepository.find({
-      where: { patientId },
-      order: { createdAt: 'DESC' },
-      relations: { doctor: true, visit: true, triage: true },
-    });
+    return this.findPage(
+      {
+        where: { patientId },
+        relations: { doctor: true, visit: true, triage: true },
+        order: { createdAt: 'DESC', id: 'DESC' },
+      },
+      query,
+    );
   }
 
   async findByVisit(visitId: string): Promise<Consultation[]> {
@@ -218,7 +225,10 @@ export class ConsultationService extends BaseCrudService<Consultation> {
       throw new BadRequestException('Cancelled consultation cannot be edited');
     }
 
-    if (dto.patientId !== undefined && dto.patientId !== consultation.patientId) {
+    if (
+      dto.patientId !== undefined &&
+      dto.patientId !== consultation.patientId
+    ) {
       await this.patientsService.findOne(dto.patientId);
       consultation.patientId = dto.patientId;
     }
@@ -291,13 +301,19 @@ export class ConsultationService extends BaseCrudService<Consultation> {
   async complete(
     id: string,
     dto: CompleteConsultationDto,
+    actorRole?: UserRole,
   ): Promise<{
     consultation: Consultation;
     queueUpdate: unknown | null;
   }> {
+    if (actorRole && dto.nextIntents?.length) {
+      assertCanRouteClinically(actorRole);
+    }
     const consultation = await this.findOne(id);
     if (consultation.status === ConsultationStatus.CANCELLED) {
-      throw new BadRequestException('Cancelled consultation cannot be completed');
+      throw new BadRequestException(
+        'Cancelled consultation cannot be completed',
+      );
     }
 
     if (consultation.status !== ConsultationStatus.COMPLETED) {
@@ -311,9 +327,11 @@ export class ConsultationService extends BaseCrudService<Consultation> {
 
     let queueUpdate: unknown | null = null;
     if (consultation.visitId) {
-      if (dto.nextIntents && dto.nextIntents.length > 0) {
-        await this.queueEntries.appendIntents(consultation.visitId, dto.nextIntents);
-      }
+      await this.queueEntries.routeFromDoctor(
+        consultation.visitId,
+        dto.nextIntents ?? [],
+        consultation.department,
+      );
       const result = await this.queueEntries.completeCurrentFor(
         consultation.visitId,
         consultation.department,
