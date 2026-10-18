@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ConflictException,
   Injectable,
   NotFoundException,
@@ -94,6 +95,7 @@ export class PatientsService extends BaseCrudService<Patient> {
   override async update(id: string, dto: UpdatePatientDto): Promise<Patient> {
     const existing = await this.findOne(id);
     const { emergencyContact, ...rest } = dto;
+    if (!emergencyContact) await this.assertHasNextOfKin(id);
     await super.update(id, rest);
     if (emergencyContact) {
       await this.contactService.upsertForPatient(id, emergencyContact);
@@ -111,6 +113,19 @@ export class PatientsService extends BaseCrudService<Patient> {
     }
 
     return updated;
+  }
+
+  // Legacy rows may lack a next of kin; any edit must add one (R2).
+  private async assertHasNextOfKin(id: string): Promise<void> {
+    const patient = await this.patientsRepository.findOne({
+      where: { id },
+      relations: { contact: true },
+    });
+    if (!patient?.contact) {
+      throw new BadRequestException(
+        'emergencyContact (next of kin) is required for this patient',
+      );
+    }
   }
 
   // Clinical records are kept; deleting a patient only archives the row.
