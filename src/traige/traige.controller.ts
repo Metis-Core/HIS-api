@@ -22,6 +22,7 @@ import { QueryTriageDto } from './dto/query-triage.dto';
 import { UpdateTriageDto } from './dto/update-traige.dto';
 import { TraigeService } from './traige.service';
 import { PaginationQueryDTO } from 'common/pagination';
+import { QueryTriageQueueDTO } from './dto/query-triage-queue.dto';
 
 @Controller('triage')
 export class TraigeController {
@@ -45,8 +46,8 @@ export class TraigeController {
 
   @Get('queue')
   @Roles(RoleGroups.FRONT_DESK_CLINICAL)
-  findQueue(@Query('status') status?: TriageStatus) {
-    return this.traigeService.findQueue(status ?? TriageStatus.WAITING);
+  findQueue(@Query() query: QueryTriageQueueDTO) {
+    return this.traigeService.findQueue(query.status ?? TriageStatus.WAITING);
   }
 
   @Get('patient/:patientId')
