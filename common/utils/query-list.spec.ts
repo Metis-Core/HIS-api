@@ -1,7 +1,7 @@
 import 'reflect-metadata';
 import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
-import { SelectQueryBuilder } from 'typeorm';
+import { Brackets, SelectQueryBuilder, WhereExpressionBuilder } from 'typeorm';
 import { QueryPrescriptionsDto } from 'src/pharmacy/dto/query-prescriptions.dto';
 import { PrescriptionStatus } from 'src/pharmacy/enums/prescription-status.enum';
 import { toList, wherePatientMatches } from './query-list';
@@ -57,5 +57,25 @@ describe('query-list helpers', () => {
 
     // Assert
     expect(andWhere).toHaveBeenCalledTimes(2);
+  });
+
+  it('matches a search word against name, MRN and phone', () => {
+    // Arrange
+    const andWhere = jest.fn<void, [Brackets]>();
+    const qb = { andWhere } as unknown as SelectQueryBuilder<object>;
+    const orWhere = jest.fn<void, [string]>();
+
+    // Act
+    wherePatientMatches(qb, 'patient', '0772');
+    const [brackets] = andWhere.mock.calls[0];
+    brackets.whereFactory({ orWhere } as unknown as WhereExpressionBuilder);
+
+    // Assert
+    expect(orWhere.mock.calls.map(([sql]) => sql)).toEqual([
+      'patient.firstName ILIKE :patientTerm0',
+      'patient.lastName ILIKE :patientTerm0',
+      'patient.mrn ILIKE :patientTerm0',
+      'patient.phone ILIKE :patientTerm0',
+    ]);
   });
 });

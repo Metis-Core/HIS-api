@@ -10,7 +10,7 @@ export const toList = ({ value }: { value: unknown }): unknown =>
         .filter(Boolean)
     : value;
 
-/** Narrows a list by patient name or MRN; every word must match one of them. */
+/** Narrows a list by patient name, MRN or phone; every word must match one of them. */
 export function wherePatientMatches<T extends ObjectLiteral>(
   qb: SelectQueryBuilder<T>,
   patientAlias: string,
@@ -21,7 +21,7 @@ export function wherePatientMatches<T extends ObjectLiteral>(
     const param = `patientTerm${index}`;
     qb.andWhere(
       new Brackets((sub) => {
-        ['firstName', 'lastName', 'mrn'].forEach((field) =>
+        ['firstName', 'lastName', 'mrn', 'phone'].forEach((field) =>
           sub.orWhere(`${patientAlias}.${field} ILIKE :${param}`, {
             [param]: containsPattern(word),
           }),

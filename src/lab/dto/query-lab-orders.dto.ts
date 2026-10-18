@@ -7,11 +7,12 @@ import {
   MaxLength,
 } from 'class-validator';
 import { toList } from 'common/utils/query-list';
-import { BaseFilterDTO } from 'common/dto/filter.dto';
+import { DateRangeFilterDTO } from 'common/dto/date-range.dto';
 import { LabOrderStatus } from '../enums/lab-order-status.enum';
 import { LabPriority } from '../enums/lab-priority.enum';
 
-export class QueryLabOrdersDto extends BaseFilterDTO {
+/** L10: search by patient name/MRN/phone and the day the order was raised. */
+export class QueryLabOrdersDto extends DateRangeFilterDTO {
   @IsOptional()
   @IsUUID()
   patientId?: string;

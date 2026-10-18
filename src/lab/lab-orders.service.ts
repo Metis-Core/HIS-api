@@ -19,6 +19,7 @@ import { LabOrderCancelledEvent } from './events/lab-order-cancelled.event';
 import { PaginationQueryDTO, pageWindow, toPage } from 'common/pagination';
 import { commitThenEmit } from 'common/events/after-commit';
 import { wherePatientMatches } from 'common/utils/query-list';
+import { whereDayRange } from 'common/utils/date-range';
 
 @Injectable()
 export class LabOrdersService extends BaseCrudService<LabOrder> {
@@ -82,6 +83,7 @@ export class LabOrdersService extends BaseCrudService<LabOrder> {
     if (query.status?.length)
       qb.andWhere('order.status IN (:...statuses)', { statuses: query.status });
     wherePatientMatches(qb, 'patient', query.search);
+    whereDayRange(qb, 'order.createdAt', query);
     if (query.priority)
       qb.andWhere('order.priority = :priority', { priority: query.priority });
 
