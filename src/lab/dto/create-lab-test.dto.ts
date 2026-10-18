@@ -23,6 +23,11 @@ export class CreateLabTestDto {
   @Matches(/^[A-Z0-9_-]+$/)
   code: string;
 
+  @IsOptional()
+  @IsString({ message: 'abbreviation must be text' })
+  @MaxLength(64, { message: 'abbreviation must be at most 64 characters' })
+  abbreviation?: string;
+
   @IsString()
   @IsNotEmpty()
   @MaxLength(150)

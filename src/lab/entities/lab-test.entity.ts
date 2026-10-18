@@ -10,6 +10,10 @@ export class LabTest extends BaseEntity {
   @Column({ type: 'varchar', length: 32 })
   code: string;
 
+  // Common short name (e.g. FBC for CBC) so staff can search the way they speak.
+  @Column({ type: 'varchar', length: 64, nullable: true })
+  abbreviation: string | null;
+
   @Column({ type: 'varchar', length: 150 })
   name: string;
 

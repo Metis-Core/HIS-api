@@ -9,6 +9,7 @@ import { UpdateLabTestDto } from './dto/update-lab-test.dto';
 import { LabTest } from './entities/lab-test.entity';
 import { pageWindow, toPage } from 'common/pagination';
 import { assertValidSchema } from './results/validate-schema';
+import { containsPattern } from 'common/utils/like-pattern';
 
 @Injectable()
 export class LabTestsService extends BaseCrudService<LabTest> {
@@ -43,9 +44,9 @@ export class LabTestsService extends BaseCrudService<LabTest> {
     if (query.isActive !== undefined)
       qb.andWhere('test.isActive = :isActive', { isActive: query.isActive });
     if (query.search?.trim()) {
-      const term = `%${query.search.trim().toLowerCase()}%`;
+      const term = containsPattern(query.search.trim());
       qb.andWhere(
-        '(LOWER(test.name) LIKE :term OR LOWER(test.code) LIKE :term)',
+        '(test.name ILIKE :term OR test.code ILIKE :term OR test.abbreviation ILIKE :term)',
         { term },
       );
     }
