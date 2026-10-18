@@ -23,7 +23,8 @@ export function patientScopeFor(role: UserRole): PatientScope {
 
 // Table names are fixed literals here, never user input.
 const SCOPE_EXISTS: Record<Exclude<PatientScope, PatientScope.ALL>, string> = {
-  [PatientScope.LAB]: `EXISTS (SELECT 1 FROM "lab_orders" scoped WHERE scoped."patientId" = patient.id AND scoped."deletedAt" IS NULL)`,
+  // A walk-in sent to the lab has a lab queue entry before any order exists.
+  [PatientScope.LAB]: `(EXISTS (SELECT 1 FROM "lab_orders" scoped WHERE scoped."patientId" = patient.id AND scoped."deletedAt" IS NULL) OR EXISTS (SELECT 1 FROM "queue_entries" qe JOIN "visits" v ON v.id = qe."visitId" WHERE v."patientId" = patient.id AND qe."department" = 'main_laboratory' AND qe."deletedAt" IS NULL AND v."deletedAt" IS NULL))`,
   [PatientScope.PHARMACY]: `EXISTS (SELECT 1 FROM "prescriptions" scoped WHERE scoped."patientId" = patient.id AND scoped."deletedAt" IS NULL)`,
   [PatientScope.BILLING]: `EXISTS (SELECT 1 FROM "visits" scoped WHERE scoped."patientId" = patient.id AND scoped."deletedAt" IS NULL)`,
 };

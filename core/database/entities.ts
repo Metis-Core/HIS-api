@@ -12,6 +12,8 @@ import { InventoryStore } from 'src/inventory/entities/inventory-store.entity';
 import { InventoryTransaction } from 'src/inventory/entities/inventory-transaction.entity';
 import { LabOrder } from 'src/lab/entities/lab-order.entity';
 import { LabOrderItem } from 'src/lab/entities/lab-order-item.entity';
+import { LabAttachment } from 'src/lab/attachments/lab-attachment.entity';
+import { LabResultAmendment } from 'src/lab/entities/lab-result-amendment.entity';
 import { LabTest } from 'src/lab/entities/lab-test.entity';
 import { Notification } from 'src/notifications/entities/notification.entity';
 import { OneTimePassword } from 'src/otp/entities/otp.entity';
@@ -46,6 +48,8 @@ export const entities = [
   LabTest,
   LabOrder,
   LabOrderItem,
+  LabResultAmendment,
+  LabAttachment,
   InventoryStore,
   InventoryItem,
   InventoryStock,

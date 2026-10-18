@@ -3,7 +3,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { UserRole } from 'common/enums/userRoles.enum';
 import { InventoryItem } from 'src/inventory/entities/inventory-item.entity';
-import { LabOrdersService } from 'src/lab/lab-orders.service';
+import { LabOrderIntakeService } from 'src/lab/lab-order-intake.service';
 import { PharmacyService } from 'src/pharmacy/pharmacy.service';
 import { ConsultationOrdersService } from './consultation-orders.service';
 import { ConsultationService } from './consultation.service';
@@ -35,7 +35,7 @@ describe('ConsultationOrdersService allergy warning (M-12)', () => {
       providers: [
         ConsultationOrdersService,
         { provide: ConsultationService, useValue: consultations },
-        { provide: LabOrdersService, useValue: {} },
+        { provide: LabOrderIntakeService, useValue: {} },
         { provide: PharmacyService, useValue: pharmacy },
         { provide: getRepositoryToken(InventoryItem), useValue: items },
       ],

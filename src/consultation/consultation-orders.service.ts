@@ -3,7 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 import { InventoryItem } from 'src/inventory/entities/inventory-item.entity';
 import { LabOrder } from 'src/lab/entities/lab-order.entity';
-import { LabOrdersService } from 'src/lab/lab-orders.service';
+import { LabOrderIntakeService } from 'src/lab/lab-order-intake.service';
 import { Prescription } from 'src/pharmacy/entities/prescription.entity';
 import { PharmacyService } from 'src/pharmacy/pharmacy.service';
 import { AllergyMatch, findAllergyMatches } from './allergy-check';
@@ -21,7 +21,7 @@ import { Consultation } from './entities/consultation.entity';
 export class ConsultationOrdersService {
   constructor(
     private readonly consultations: ConsultationService,
-    private readonly labOrders: LabOrdersService,
+    private readonly labOrders: LabOrderIntakeService,
     private readonly pharmacy: PharmacyService,
     @InjectRepository(InventoryItem)
     private readonly items: Repository<InventoryItem>,

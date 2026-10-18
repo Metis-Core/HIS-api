@@ -2,23 +2,7 @@ import { Column, Entity, Index } from 'typeorm';
 import { BaseEntity } from 'common/entities/base.entity';
 import { LabSampleType } from '../enums/lab-sample-type.enum';
 import { LabTestCategory } from '../enums/lab-test-category.enum';
-
-export type LabResultFieldType = 'number' | 'text' | 'select' | 'boolean';
-
-export interface LabResultField {
-  key: string;
-  label: string;
-  type: LabResultFieldType;
-  unit?: string;
-  referenceRange?: string;
-  options?: string[];
-  required?: boolean;
-  helpText?: string;
-}
-
-export interface LabResultSchema {
-  fields: LabResultField[];
-}
+import type { LabResultSchema } from '../results/result-schema.types';
 
 @Entity('lab_tests')
 export class LabTest extends BaseEntity {
@@ -26,13 +10,21 @@ export class LabTest extends BaseEntity {
   @Column({ type: 'varchar', length: 32 })
   code: string;
 
+  // Common short name (e.g. FBC for CBC) so staff can search the way they speak.
+  @Column({ type: 'varchar', length: 64, nullable: true })
+  abbreviation: string | null;
+
   @Column({ type: 'varchar', length: 150 })
   name: string;
 
   @Column({ type: 'varchar', length: 500, nullable: true })
   description: string | null;
 
-  @Column({ type: 'enum', enum: LabTestCategory, default: LabTestCategory.OTHER })
+  @Column({
+    type: 'enum',
+    enum: LabTestCategory,
+    default: LabTestCategory.OTHER,
+  })
   category: LabTestCategory;
 
   @Column({ type: 'enum', enum: LabSampleType, default: LabSampleType.BLOOD })
@@ -40,9 +32,6 @@ export class LabTest extends BaseEntity {
 
   @Column({ type: 'varchar', length: 32, nullable: true })
   unit: string | null;
-
-  @Column({ type: 'varchar', length: 150, nullable: true })
-  referenceRange: string | null;
 
   @Column({ type: 'int', default: 0 })
   price: number;

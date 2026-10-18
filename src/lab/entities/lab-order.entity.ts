@@ -59,6 +59,20 @@ export class LabOrder extends BaseEntity {
   @Column({ type: 'varchar', length: 500, nullable: true })
   clinicalNotes: string | null;
 
+  // Walk-ins often bring a request from an outside clinician.
+  @Column({ type: 'varchar', length: 150, nullable: true })
+  referringClinician: string | null;
+
+  @Column({ type: 'varchar', length: 500, nullable: true })
+  cancellationReason: string | null;
+
+  @Column({ type: 'uuid', nullable: true })
+  cancelledById: string | null;
+
+  @ManyToOne(() => User, { nullable: true, onDelete: 'SET NULL' })
+  @JoinColumn({ name: 'cancelledById' })
+  cancelledBy: User | null;
+
   @Column({ type: 'timestamp', nullable: true })
   completedAt: Date | null;
 

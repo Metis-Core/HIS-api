@@ -90,7 +90,7 @@ export class VisitsService extends BaseCrudService<Visit> {
 
     this.events.emit(
       VisitCheckedInEvent.channel,
-      new VisitCheckedInEvent(visit.id, patientId, handler),
+      new VisitCheckedInEvent(visit.id, patientId, handler, CHECK_IN_INTENTS),
     );
 
     return visit;
