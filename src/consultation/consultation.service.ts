@@ -16,6 +16,7 @@ import {
   assertCanEditConsultation,
   assertIsDoctor,
 } from './consultation-access.policy';
+import { assertOpenForEditing } from './consultation-lock.policy';
 import {
   encounterChanges,
   headerChanges,
@@ -58,12 +59,12 @@ export class ConsultationService extends BaseCrudService<Consultation> {
       visitId: dto.visitId ?? null,
       triageId: dto.triageId ?? null,
       type: dto.type ?? ConsultationType.OUTPATIENT,
-      status: dto.status ?? ConsultationStatus.IN_PROGRESS,
+      status: ConsultationStatus.IN_PROGRESS,
       department: dto.department ?? Department.OUTPATIENT_CLINIC,
       chiefComplaint: dto.chiefComplaint.trim(),
       followUpDate: dto.followUpDate ?? null,
       startedAt: dto.startedAt ? new Date(dto.startedAt) : now,
-      completedAt: dto.status === ConsultationStatus.COMPLETED ? now : null,
+      completedAt: null,
     });
     const saved = await this.consultationsRepository.save(consultation);
     return this.findOne(saved.id);
@@ -94,9 +95,7 @@ export class ConsultationService extends BaseCrudService<Consultation> {
     actor: ConsultationActor,
   ): Promise<Consultation> {
     const consultation = await this.findEditable(id, actor);
-    if (consultation.status === ConsultationStatus.CANCELLED) {
-      throw new BadRequestException('Cancelled consultation cannot be edited');
-    }
+    assertOpenForEditing(consultation);
     if (
       dto.patientId !== undefined &&
       dto.patientId !== consultation.patientId
@@ -113,16 +112,9 @@ export class ConsultationService extends BaseCrudService<Consultation> {
     if (dto.visitId !== undefined) consultation.visitId = dto.visitId || null;
     if (dto.triageId !== undefined)
       consultation.triageId = dto.triageId || null;
-    if (
-      dto.status === ConsultationStatus.COMPLETED &&
-      !consultation.completedAt
-    ) {
-      consultation.completedAt = new Date();
-    }
     Object.assign(consultation, encounterChanges(dto), headerChanges(dto), {
       type: dto.type ?? consultation.type,
       department: dto.department ?? consultation.department,
-      status: dto.status ?? consultation.status,
     });
     await this.consultationsRepository.save(consultation);
     return this.findOne(id);

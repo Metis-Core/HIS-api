@@ -89,6 +89,13 @@ export class Consultation extends BaseEntity {
   @Column({ type: 'text', nullable: true })
   notes: string | null;
 
+  /** Hand-off note written when signing, kept apart from the clinical notes (M-10). */
+  @Column({ type: 'text', nullable: true })
+  completionNotes: string | null;
+
+  @Column({ type: 'varchar', length: 500, nullable: true })
+  cancellationReason: string | null;
+
   @Column({ type: 'date', nullable: true })
   followUpDate: string | null;
 

@@ -20,6 +20,7 @@ import { PaginationQueryDTO } from 'common/pagination';
 import { ConsultationLifecycleService } from './consultation-lifecycle.service';
 import { ConsultationQueryService } from './consultation-query.service';
 import { ConsultationService } from './consultation.service';
+import { CancelConsultationDTO } from './dto/cancel-consultation.dto';
 import { CompleteConsultationDto } from './dto/complete-consultation.dto';
 import { CreateConsultationDto } from './dto/create-consultation.dto';
 import { QueryConsultationsDto } from './dto/query-consultations.dto';
@@ -104,10 +105,10 @@ export class ConsultationController {
   @Roles(RoleGroups.PROVIDERS)
   cancel(
     @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: CancelConsultationDTO,
     @CurrentUser() user: AuthenticatedUser,
-    @Body('reason') reason?: string,
   ) {
-    return this.lifecycle.cancel(id, user, reason);
+    return this.lifecycle.cancel(id, user, dto.reason);
   }
 
   @Delete(':id')

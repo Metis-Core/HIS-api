@@ -1,10 +1,11 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { ConflictException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { QueueEntry } from 'src/queue/entities/queue-entry.entity';
 import { QueueEntriesService } from 'src/queue/queue-entries.service';
 import { assertCanRouteClinically } from 'src/queue/journey/assert-can-route';
 import { ConsultationActor } from './consultation-access.policy';
+import { assertOpenForEditing } from './consultation-lock.policy';
 import { ConsultationService } from './consultation.service';
 import { CompleteConsultationDto } from './dto/complete-consultation.dto';
 import { Consultation } from './entities/consultation.entity';
@@ -34,21 +35,13 @@ export class ConsultationLifecycleService {
   ): Promise<CompletedConsultation> {
     if (dto.nextIntents?.length) assertCanRouteClinically(actor.role);
     const consultation = await this.consultations.findEditable(id, actor);
-    if (consultation.status === ConsultationStatus.CANCELLED) {
-      throw new BadRequestException(
-        'Cancelled consultation cannot be completed',
-      );
-    }
-    if (consultation.status !== ConsultationStatus.COMPLETED) {
-      consultation.status = ConsultationStatus.COMPLETED;
-      consultation.completedAt = new Date();
-      if (dto.notes) consultation.notes = dto.notes;
-      await this.consultationsRepository.save(consultation);
-    }
-    return {
-      consultation: await this.consultations.findOne(id),
-      queueUpdate: await this.handOff(consultation, dto),
-    };
+    assertOpenForEditing(consultation);
+    consultation.status = ConsultationStatus.COMPLETED;
+    consultation.completedAt = new Date();
+    consultation.completionNotes = dto.notes?.trim() || null;
+    await this.consultationsRepository.save(consultation);
+    const queueUpdate = await this.handOff(consultation, dto);
+    return { consultation: await this.consultations.findOne(id), queueUpdate };
   }
 
   async cancel(
@@ -57,11 +50,15 @@ export class ConsultationLifecycleService {
     reason?: string,
   ): Promise<Consultation> {
     const consultation = await this.consultations.findEditable(id, actor);
-    if (consultation.status === ConsultationStatus.CANCELLED)
+    if (consultation.status === ConsultationStatus.CANCELLED) {
       return consultation;
+    }
+    if (consultation.status === ConsultationStatus.COMPLETED) {
+      throw new ConflictException('A signed consultation cannot be cancelled');
+    }
     consultation.status = ConsultationStatus.CANCELLED;
-    consultation.completedAt = consultation.completedAt ?? new Date();
-    if (reason) consultation.notes = reason;
+    consultation.completedAt = new Date();
+    consultation.cancellationReason = reason?.trim() || null;
     await this.consultationsRepository.save(consultation);
     return this.consultations.findOne(id);
   }

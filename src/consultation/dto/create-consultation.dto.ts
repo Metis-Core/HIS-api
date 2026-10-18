@@ -8,7 +8,6 @@ import {
   MaxLength,
 } from 'class-validator';
 import { Department } from 'common/enums/department.enum';
-import { ConsultationStatus } from 'src/consultation/enums/consultation-status.enum';
 import { ConsultationType } from 'src/consultation/enums/consultation-type.enum';
 
 export class CreateConsultationDto {
@@ -30,10 +29,6 @@ export class CreateConsultationDto {
   @IsOptional()
   @IsEnum(ConsultationType)
   type?: ConsultationType;
-
-  @IsOptional()
-  @IsEnum(ConsultationStatus)
-  status?: ConsultationStatus;
 
   @IsOptional()
   @IsEnum(Department)
