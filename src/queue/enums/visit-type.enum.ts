@@ -11,6 +11,7 @@ export enum VisitIntenentsEnum {
   RADIOLOGY = 'radiology',
   DENTAL = 'dental',
   ANTENATAL = 'antenatal',
+  IMMUNIZATION = 'immunization',
   PHARMACY = 'pharmacy',
   SURGERY = 'surgery',
   POSTOPERATIVE = 'postoperative',

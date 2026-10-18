@@ -8,7 +8,7 @@ import { CreateServiceDTO } from './dto/create-service.dto';
 import { QueryServicesDTO } from './dto/query-services.dto';
 import { UpdateServiceDTO } from './dto/update-service.dto';
 import { Service } from './entities/service.entity';
-import { ServiceCode } from './service-codes';
+import { ServiceCode, ServiceCodeValue } from './service-codes';
 
 @Injectable()
 export class ServicesService extends BaseCrudService<Service> {
@@ -69,6 +69,10 @@ export class ServicesService extends BaseCrudService<Service> {
       .getManyAndCount();
 
     return toPage(items, total, window);
+  }
+
+  findActiveByCode(code: ServiceCodeValue): Promise<Service | null> {
+    return this.servicesRepository.findOne({ where: { code, isActive: true } });
   }
 
   async findConsultationService(): Promise<Service | null> {

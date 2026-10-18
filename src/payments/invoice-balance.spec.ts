@@ -43,6 +43,12 @@ describe('settle', () => {
     expect(result.status).toBe(InvoiceStatus.PARTIALLY_PAID);
   });
 
+  it('settles a bill that is only free services', () => {
+    const result = settle([charge(0)], []);
+    expect(result.status).toBe(InvoiceStatus.PAID);
+    expect(result.total).toBe(0);
+  });
+
   it('does not call an empty bill paid', () => {
     expect(settle([], []).status).toBe(InvoiceStatus.UNPAID);
   });

@@ -1,6 +1,9 @@
 // Stable machine codes for services the system looks up itself; names stay free for staff to edit.
 export const ServiceCode = {
   CONSULTATION: 'CONSULTATION',
+  ANTENATAL_VISIT: 'ANTENATAL_VISIT',
+  IMMUNIZATION: 'IMMUNIZATION',
+  ADMISSION_FEE: 'ADMISSION_FEE',
 } as const;
 
 export type ServiceCodeValue = (typeof ServiceCode)[keyof typeof ServiceCode];

@@ -2,6 +2,7 @@ import { BadRequestException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { BaseCrudService } from 'common/services/crud.service';
+import { ServiceCodeValue } from 'src/services/service-codes';
 import { ServicesService } from 'src/services/services.service';
 import { InvoicesService } from './invoices.service';
 import { CreateVisitChargeDto } from './dto/create-visit-charge.dto';
@@ -83,6 +84,51 @@ export class PaymentsService extends BaseCrudService<VisitCharge> {
       quantity: 1,
       addedById,
     });
+  }
+
+  /** Bills a priced service looked up by its code; a fee of 0 is recorded as a free line. */
+  async addServiceFee(
+    visitId: string,
+    code: ServiceCodeValue,
+    addedById: string,
+  ): Promise<VisitCharge | null> {
+    const service = await this.servicesService.findActiveByCode(code);
+    if (!service) return null;
+    return this.record({
+      visitId,
+      source: ChargeSource.SERVICE,
+      referenceId: service.id,
+      description: service.name,
+      unitPrice: service.fee,
+      quantity: 1,
+      addedById,
+    });
+  }
+
+  async addPrescriptionCharges(
+    visitId: string,
+    prescriptionId: string,
+    lines: readonly { name: string; quantity: number; unitPrice: number }[],
+    addedById: string,
+  ): Promise<VisitCharge[]> {
+    const priced = lines.filter((line) => line.unitPrice > 0);
+    if (priced.length === 0) return [];
+    const saved = await this.charges.save(
+      priced.map((line) =>
+        this.charges.create({
+          visitId,
+          source: ChargeSource.PHARMACY,
+          referenceId: prescriptionId,
+          description: line.name,
+          unitPrice: line.unitPrice,
+          quantity: line.quantity,
+          amount: line.unitPrice * line.quantity,
+          addedById,
+        }),
+      ),
+    );
+    await this.invoices.syncForVisit(visitId);
+    return saved;
   }
 
   async addLabCharges(

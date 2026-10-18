@@ -12,15 +12,16 @@ export function settle(
   charges: ReadonlyArray<{ amount: number; status: ChargeStatus }>,
   payments: ReadonlyArray<{ amount: number; status: PaymentStatus }>,
 ): Settlement {
-  const total = charges
-    .filter((charge) => charge.status !== ChargeStatus.WAIVED)
-    .reduce((sum, charge) => sum + charge.amount, 0);
+  const billable = charges.filter(
+    (charge) => charge.status !== ChargeStatus.WAIVED,
+  );
+  const total = billable.reduce((sum, charge) => sum + charge.amount, 0);
   const paid = payments
     .filter((payment) => payment.status === PaymentStatus.RECORDED)
     .reduce((sum, payment) => sum + payment.amount, 0);
   const balance = Math.max(total - paid, 0);
   const status =
-    total > 0 && balance === 0
+    billable.length > 0 && balance === 0
       ? InvoiceStatus.PAID
       : paid > 0
         ? InvoiceStatus.PARTIALLY_PAID
