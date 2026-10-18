@@ -6,25 +6,7 @@ import {
   escape,
   formatDate,
 } from './shared';
-
-function renderResultValue(raw: string | null): string {
-  if (!raw) return '<span class="muted">Pending</span>';
-  try {
-    const parsed = JSON.parse(raw);
-    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
-      const rows = Object.entries(parsed as Record<string, unknown>)
-        .map(
-          ([k, v]) =>
-            `<tr class="row"><td class="k">${escape(k)}</td><td class="v">${escape(String(v))}</td></tr>`,
-        )
-        .join('');
-      return `<table>${rows}</table>`;
-    }
-  } catch {
-    // fall through
-  }
-  return `<span class="value">${escape(raw)}</span>`;
-}
+import { renderResultTable } from './lab-result-table';
 
 export function renderLabOrderReport(order: LabOrder): string {
   const patient = order.patient;
@@ -36,16 +18,11 @@ export function renderLabOrderReport(order: LabOrder): string {
   const itemsHtml = order.items
     .map((item) => {
       const test = item.test;
-      const referenceRange =
-        item.test?.referenceRange || item.test?.resultSchema ? test?.referenceRange ?? '' : '';
-      const abnormal = item.isAbnormal ? '<span class="abnormal">ABNORMAL</span>' : '';
       return `
         <tr>
           <td class="cell code">${escape(test?.code ?? '')}</td>
           <td class="cell">${escape(test?.name ?? '')}</td>
-          <td class="cell">${renderResultValue(item.resultValue)} ${abnormal}</td>
-          <td class="cell">${escape(referenceRange)}</td>
-          <td class="cell">${escape(test?.unit ?? '')}</td>
+          <td class="cell">${renderResultTable(item, patient)}</td>
           <td class="cell">${escape(formatDate(item.resultedAt))}</td>
         </tr>
       `;
@@ -102,8 +79,6 @@ export function renderLabOrderReport(order: LabOrder): string {
                 <th>Code</th>
                 <th>Test</th>
                 <th>Result</th>
-                <th>Reference</th>
-                <th>Unit</th>
                 <th>Reported</th>
               </tr>
               ${itemsHtml}

@@ -1,15 +1,13 @@
-import {
-  Column,
-  Entity,
-  Index,
-  JoinColumn,
-  ManyToOne,
-} from 'typeorm';
+import { Column, Entity, Index, JoinColumn, ManyToOne } from 'typeorm';
 import { BaseEntity } from 'common/entities/base.entity';
 import { User } from 'src/users/entities/user.entity';
 import { LabOrderItemStatus } from '../enums/lab-order-item-status.enum';
 import { LabOrder } from './lab-order.entity';
 import { LabTest } from './lab-test.entity';
+import type {
+  LabResultData,
+  LabResultFlags,
+} from '../results/result-schema.types';
 
 @Entity('lab_order_items')
 @Index(['orderId', 'testId'], { unique: true })
@@ -28,11 +26,19 @@ export class LabOrderItem extends BaseEntity {
   @Column({ type: 'uuid' })
   testId: string;
 
-  @Column({ type: 'enum', enum: LabOrderItemStatus, default: LabOrderItemStatus.PENDING })
+  @Column({
+    type: 'enum',
+    enum: LabOrderItemStatus,
+    default: LabOrderItemStatus.PENDING,
+  })
   status: LabOrderItemStatus;
 
-  @Column({ type: 'varchar', length: 255, nullable: true })
-  resultValue: string | null;
+  @Column({ type: 'jsonb', nullable: true })
+  resultData: LabResultData | null;
+
+  // Computed from the template's reference intervals on every save; never set by hand (L6).
+  @Column({ type: 'jsonb', nullable: true })
+  resultFlags: LabResultFlags | null;
 
   @Column({ type: 'text', nullable: true })
   resultNotes: string | null;

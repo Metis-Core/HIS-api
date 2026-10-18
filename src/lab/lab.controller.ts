@@ -79,7 +79,13 @@ export class LabController {
   }
 
   @Get('orders')
-  @Roles(UserRole.DOCTOR, UserRole.NURSE, UserRole.LAB_TECH, UserRole.ADMIN, UserRole.SUPER_ADMIN)
+  @Roles(
+    UserRole.DOCTOR,
+    UserRole.NURSE,
+    UserRole.LAB_TECH,
+    UserRole.ADMIN,
+    UserRole.SUPER_ADMIN,
+  )
   findAllOrders(@Query() query: QueryLabOrdersDto) {
     return this.labOrdersService.search(query);
   }
@@ -102,13 +108,24 @@ export class LabController {
   }
 
   @Get('orders/:id')
-  @Roles(UserRole.DOCTOR, UserRole.NURSE, UserRole.LAB_TECH, UserRole.ADMIN, UserRole.SUPER_ADMIN)
+  @Roles(
+    UserRole.DOCTOR,
+    UserRole.NURSE,
+    UserRole.LAB_TECH,
+    UserRole.ADMIN,
+    UserRole.SUPER_ADMIN,
+  )
   findOneOrder(@Param('id', ParseUUIDPipe) id: string) {
     return this.labOrdersService.findOne(id);
   }
 
   @Patch('orders/:id')
-  @Roles(UserRole.DOCTOR, UserRole.LAB_TECH, UserRole.ADMIN, UserRole.SUPER_ADMIN)
+  @Roles(
+    UserRole.DOCTOR,
+    UserRole.LAB_TECH,
+    UserRole.ADMIN,
+    UserRole.SUPER_ADMIN,
+  )
   updateOrder(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: UpdateLabOrderDto,

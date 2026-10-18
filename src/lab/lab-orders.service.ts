@@ -64,7 +64,9 @@ export class LabOrdersService extends BaseCrudService<LabOrder> {
       where: { id: In(testIds), isActive: true },
     });
     if (tests.length !== testIds.length) {
-      throw new BadRequestException('One or more lab tests are invalid or inactive');
+      throw new BadRequestException(
+        'One or more lab tests are invalid or inactive',
+      );
     }
 
     const order = await commitThenEmit(
@@ -118,7 +120,12 @@ export class LabOrdersService extends BaseCrudService<LabOrder> {
   override async findOne(id: string): Promise<LabOrder> {
     const order = await this.labOrdersRepository.findOne({
       where: { id },
-      relations: { items: { test: true }, patient: true, orderedBy: true, consultation: true },
+      relations: {
+        items: { test: true },
+        patient: true,
+        orderedBy: true,
+        consultation: true,
+      },
     });
     if (!order) {
       throw new NotFoundException('Lab order not found');
@@ -136,13 +143,25 @@ export class LabOrdersService extends BaseCrudService<LabOrder> {
       .leftJoinAndSelect('order.items', 'items')
       .leftJoinAndSelect('items.test', 'test');
 
-    if (query.patientId) qb.andWhere('order.patientId = :patientId', { patientId: query.patientId });
-    if (query.consultationId) qb.andWhere('order.consultationId = :consultationId', { consultationId: query.consultationId });
-    if (query.visitId) qb.andWhere('order.visitId = :visitId', { visitId: query.visitId });
-    if (query.orderedById) qb.andWhere('order.orderedById = :orderedById', { orderedById: query.orderedById });
-    if (query.status?.length) qb.andWhere('order.status IN (:...statuses)', { statuses: query.status });
+    if (query.patientId)
+      qb.andWhere('order.patientId = :patientId', {
+        patientId: query.patientId,
+      });
+    if (query.consultationId)
+      qb.andWhere('order.consultationId = :consultationId', {
+        consultationId: query.consultationId,
+      });
+    if (query.visitId)
+      qb.andWhere('order.visitId = :visitId', { visitId: query.visitId });
+    if (query.orderedById)
+      qb.andWhere('order.orderedById = :orderedById', {
+        orderedById: query.orderedById,
+      });
+    if (query.status?.length)
+      qb.andWhere('order.status IN (:...statuses)', { statuses: query.status });
     wherePatientMatches(qb, 'patient', query.search);
-    if (query.priority) qb.andWhere('order.priority = :priority', { priority: query.priority });
+    if (query.priority)
+      qb.andWhere('order.priority = :priority', { priority: query.priority });
 
     const [items, total] = await qb
       .orderBy('order.createdAt', sortOrder)
@@ -215,7 +234,11 @@ export class LabOrdersService extends BaseCrudService<LabOrder> {
         );
         after.emit(
           LabOrderCancelledEvent.name,
-          new LabOrderCancelledEvent(order.id, order.patientId, order.orderedById),
+          new LabOrderCancelledEvent(
+            order.id,
+            order.patientId,
+            order.orderedById,
+          ),
         );
         return order;
       },

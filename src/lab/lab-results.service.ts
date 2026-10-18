@@ -12,6 +12,8 @@ import { LabOrderStatus } from './enums/lab-order-status.enum';
 import { LabOrderCompletedEvent } from './events/lab-order-completed.event';
 import { LabResultReadyEvent } from './events/lab-result-ready.event';
 import { LabOrdersService } from './lab-orders.service';
+import { applyResultData } from './results/apply-result';
+import { patientContext } from './results/patient-context';
 
 const IN_PROGRESS = [
   LabOrderItemStatus.COLLECTED,
@@ -44,16 +46,24 @@ export class LabResultsService {
       async (manager, after) => {
         const item = await manager.findOne(LabOrderItem, {
           where: { id: itemId, orderId },
-          relations: { test: true },
+          relations: { test: true, order: { patient: true } },
         });
         if (!item) throw new NotFoundException('Lab order item not found');
 
+        const target = dto.status ?? item.status;
+        const ready = target === LabOrderItemStatus.RESULT_READY;
+        if (dto.resultData !== undefined || ready) {
+          applyResultData(
+            item,
+            item.test,
+            dto.resultData ?? item.resultData ?? {},
+            patientContext(item.order.patient, new Date()),
+            ready,
+          );
+        }
         if (dto.status !== undefined) item.status = dto.status;
-        if (dto.resultValue !== undefined)
-          item.resultValue = dto.resultValue?.trim() || null;
         if (dto.resultNotes !== undefined)
           item.resultNotes = dto.resultNotes?.trim() || null;
-        if (dto.isAbnormal !== undefined) item.isAbnormal = dto.isAbnormal;
         if (dto.status === LabOrderItemStatus.COLLECTED && !item.collectedAt) {
           item.collectedAt = new Date();
         }
