@@ -12,6 +12,7 @@ import { QueueEntryStatus } from './enums/queue-entry-status.enum';
 import { intentDepartmentMap } from './intent-department.map';
 import { VisitIntenentsEnum } from './enums/visit-type.enum';
 import { VisitCheckedInEvent } from './events/visit-checked-in.event';
+import { buildVisitTimeline, VisitTimeline } from './journey/visit-timeline';
 import { BaseCrudService } from '../../common/services/crud.service';
 
 const CHECK_IN_INTENTS = [
@@ -72,6 +73,15 @@ export class VisitsService extends BaseCrudService<Visit> {
     );
 
     return visit;
+  }
+
+  async timeline(id: string): Promise<VisitTimeline> {
+    await this.findByStringId(id);
+    const entries = await this.queueEntriesRepository.find({
+      where: { visitId: id },
+      relations: { servedBy: true },
+    });
+    return buildVisitTimeline(entries, new Date());
   }
 
   // Reception is recorded as a finished first stage so waits are measured from registration.

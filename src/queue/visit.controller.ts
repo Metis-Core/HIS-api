@@ -139,6 +139,12 @@ export class VisitController {
     return formatResponse(visit);
   }
 
+  @Get(':id/timeline')
+  @Roles(RoleGroups.FLOOR_STAFF)
+  async getVisitTimeline(@Param('id', ParseUUIDPipe) id: string) {
+    return formatResponse(await this.visitService.timeline(id));
+  }
+
   @Get(':id')
   @Roles(RoleGroups.FLOOR_STAFF)
   async getVisit(@Param('id', ParseUUIDPipe) id: string) {
