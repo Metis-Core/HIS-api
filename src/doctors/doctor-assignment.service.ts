@@ -19,6 +19,7 @@ import { DoctorDirectoryService } from './doctor-directory.service';
 import { isAssignable, pickDoctor } from './doctor-selection';
 import { ReassignVisitDto } from './dto/reassign-visit.dto';
 import { DoctorAssignedEvent } from './events/doctor-assigned.event';
+import { DoctorRequestUnavailableEvent } from './events/doctor-request-unavailable.event';
 
 const READY_AND_UNSTARTED = `entry.status IN (:...unstarted) AND NOT EXISTS (
   SELECT 1 FROM "queue_entries" earlier
@@ -32,6 +33,8 @@ const OPEN_STATUSES = [
   QueueEntryStatus.CALLED,
   QueueEntryStatus.IN_SERVICE,
 ];
+
+const REQUESTED_REASON = 'Asked for by the patient';
 
 interface AssignmentTrail {
   source: AssignmentSource;
@@ -100,6 +103,38 @@ export class DoctorAssignmentService {
     });
   }
 
+  /** Gives the patient to the doctor they asked for; if that doctor cannot take them, the usual choice applies and reception is told. */
+  assignRequested(
+    visitId: string,
+    doctorId: string,
+    byId: string,
+  ): Promise<Visit> {
+    return this.serial(async () => {
+      const visit = await this.loadVisit(visitId);
+      const candidates = await this.directory.candidates();
+      const candidate = candidates.find((c) => c.id === doctorId);
+      if (candidate && isAssignable(candidate.availability)) {
+        return this.apply(
+          visit,
+          doctorId,
+          { source: AssignmentSource.MANUAL, byId, reason: REQUESTED_REASON },
+          true,
+        );
+      }
+      const fallback = await this.pickFor(visit);
+      this.events.emit(
+        DoctorRequestUnavailableEvent.channel,
+        new DoctorRequestUnavailableEvent(
+          visitId,
+          doctorId,
+          byId,
+          fallback.assignedDoctorId,
+        ),
+      );
+      return fallback;
+    });
+  }
+
   claim(
     visitId: string,
     doctorId: string,
@@ -164,6 +199,7 @@ export class DoctorAssignmentService {
     visit: Visit,
     doctorId: string,
     trail: AssignmentTrail,
+    requested = false,
   ): Promise<Visit> {
     const previousDoctorId = visit.assignedDoctorId;
     visit.assignedDoctorId = doctorId;
@@ -182,7 +218,12 @@ export class DoctorAssignmentService {
     if (previousDoctorId !== doctorId) {
       this.events.emit(
         DoctorAssignedEvent.channel,
-        new DoctorAssignedEvent(visit.id, doctorId, previousDoctorId),
+        new DoctorAssignedEvent(
+          visit.id,
+          doctorId,
+          previousDoctorId,
+          requested,
+        ),
       );
     }
     return this.loadWithDoctor(visit.id);

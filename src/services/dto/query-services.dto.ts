@@ -1,5 +1,5 @@
 import { IsBoolean, IsOptional, IsString, MaxLength } from 'class-validator';
-import { Type } from 'class-transformer';
+import { Transform } from 'class-transformer';
 import { CatalogueFilterDTO } from 'common/dto/catalogue-filter.dto';
 
 export class QueryServicesDTO extends CatalogueFilterDTO {
@@ -9,7 +9,9 @@ export class QueryServicesDTO extends CatalogueFilterDTO {
   search?: string;
 
   @IsOptional()
-  @Type(() => Boolean)
+  @Transform(({ value }: { value: unknown }) =>
+    value === undefined ? undefined : value === true || value === 'true',
+  )
   @IsBoolean()
   isActive?: boolean;
 }

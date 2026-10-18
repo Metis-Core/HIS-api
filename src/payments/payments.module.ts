@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { Visit } from 'src/queue/entities/visit.entity';
+import { QueueModule } from 'src/queue/queue.module';
 import { ServicesModule } from 'src/services/services.module';
 import { DayClosingService } from './day-closing.service';
 import { DayClosingsController } from './day-closings.controller';
@@ -29,6 +30,7 @@ import { ReceiptPdfService } from './receipt-pdf.service';
       Visit,
     ]),
     ServicesModule,
+    QueueModule,
   ],
   controllers: [
     PaymentsController,

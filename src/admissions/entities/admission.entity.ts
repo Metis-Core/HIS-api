@@ -5,7 +5,7 @@ import { Patient } from 'src/patients/entities/patient.entity';
 import { Visit } from 'src/queue/entities/visit.entity';
 import { User } from 'src/users/entities/user.entity';
 
-/** A doctor's decision to admit a patient to a ward (D6). Beds and discharge come later. */
+/** A doctor's decision to admit a patient to a ward (D6). Discharge ends the stay; beds come later. */
 @Entity('admissions')
 @Index(['visitId'], {
   unique: true,
@@ -50,4 +50,18 @@ export class Admission extends BaseEntity {
   @ManyToOne(() => User, { onDelete: 'RESTRICT' })
   @JoinColumn({ name: 'admittedById' })
   admittedBy: User;
+
+  @Index()
+  @Column({ type: 'timestamptz', nullable: true })
+  dischargedAt: Date | null;
+
+  @Column({ type: 'uuid', nullable: true })
+  dischargedById: string | null;
+
+  @ManyToOne(() => User, { onDelete: 'SET NULL', nullable: true })
+  @JoinColumn({ name: 'dischargedById' })
+  dischargedBy: User | null;
+
+  @Column({ type: 'text', nullable: true })
+  dischargeNotes: string | null;
 }

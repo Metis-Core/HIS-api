@@ -1,4 +1,4 @@
-import { Type } from 'class-transformer';
+import { Transform } from 'class-transformer';
 import {
   IsBoolean,
   IsEnum,
@@ -25,7 +25,9 @@ export class QueryLabTestsDto extends CatalogueFilterDTO {
   sampleType?: LabSampleType;
 
   @IsOptional()
-  @Type(() => Boolean)
+  @Transform(({ value }: { value: unknown }) =>
+    value === undefined ? undefined : value === true || value === 'true',
+  )
   @IsBoolean()
   isActive?: boolean;
 }

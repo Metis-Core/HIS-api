@@ -85,12 +85,24 @@ export const RoleGroups = {
   ]),
 
   LAB_ORDERERS: define(
-    'Staff who may raise a lab order: providers, plus the lab and reception for walk-ins.',
+    'Staff who may raise a lab order: providers, plus the lab, nurses and reception for walk-ins.',
     [
       UserRole.SUPER_ADMIN,
       UserRole.ADMIN,
       UserRole.DOCTOR,
+      UserRole.NURSE,
       UserRole.LAB_TECH,
+      UserRole.RECEPTIONIST,
+    ],
+  ),
+
+  PROCEDURE_ORDERERS: define(
+    'Staff who may order imaging or a procedure: providers, plus reception and nurses for walk-ins.',
+    [
+      UserRole.SUPER_ADMIN,
+      UserRole.ADMIN,
+      UserRole.DOCTOR,
+      UserRole.NURSE,
       UserRole.RECEPTIONIST,
     ],
   ),

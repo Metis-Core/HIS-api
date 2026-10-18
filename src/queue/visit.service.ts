@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { DeepPartial, In, Like, QueryFailedError, Repository } from 'typeorm';
@@ -11,6 +15,8 @@ import { IPagination } from 'common/response-format';
 import { QueueEntry } from './entities/queue-entry.entity';
 import { Visit } from './entities/visit.entity';
 import { QueueEntryStatus } from './enums/queue-entry-status.enum';
+import { findActiveVisit } from './journey/active-visit';
+import { planCheckIn } from './journey/check-in-plan';
 import { intentDepartmentMap } from './intent-department.map';
 import { VisitIntenentsEnum } from './enums/visit-type.enum';
 import { VisitCheckedInEvent } from './events/visit-checked-in.event';
@@ -30,11 +36,6 @@ const UNIQUE_VIOLATION = '23505';
 const EMERGENCY_NUMBER_ATTEMPTS = 3;
 import { BaseCrudService } from '../../common/services/crud.service';
 
-const CHECK_IN_INTENTS = [
-  VisitIntenentsEnum.EXAMINATION,
-  VisitIntenentsEnum.CONSULTATION,
-];
-
 @Injectable()
 export class VisitsService extends BaseCrudService<Visit> {
   constructor(
@@ -53,6 +54,7 @@ export class VisitsService extends BaseCrudService<Visit> {
     entity: CreateVisitDTO & { handler: string },
   ): Promise<Visit> {
     const { patientId, visitType, insuranceVerification, handler } = entity;
+    const intents = planCheckIn(entity);
 
     if (!handler) {
       throw new NotFoundException('Handler ID is required');
@@ -60,6 +62,11 @@ export class VisitsService extends BaseCrudService<Visit> {
     await this.usersService.findOne(handler);
     if (!patientId || !(await this.patientsService.findByStringId(patientId))) {
       throw new NotFoundException('Patient not found');
+    }
+    if (await this.findActiveFor(patientId)) {
+      throw new ConflictException(
+        'This patient already has an open visit. Finish or discharge it before starting another.',
+      );
     }
 
     const triageCategory = resolveCheckInCategory(
@@ -74,7 +81,10 @@ export class VisitsService extends BaseCrudService<Visit> {
         triageCategory,
         priority: priorityFor(triageCategory),
         metadata: {
-          initialIntents: CHECK_IN_INTENTS,
+          initialIntents: intents,
+          ...(entity.preferredDoctorId && {
+            requestedDoctorId: entity.preferredDoctorId,
+          }),
           ...(insuranceVerification && {
             insuranceVerification: {
               ...insuranceVerification,
@@ -86,14 +96,26 @@ export class VisitsService extends BaseCrudService<Visit> {
       }),
     );
 
-    await this.queueEntriesRepository.save(this.checkInEntries(visit, handler));
+    await this.queueEntriesRepository.save(
+      this.checkInEntries(visit, handler, intents),
+    );
 
     this.events.emit(
       VisitCheckedInEvent.channel,
-      new VisitCheckedInEvent(visit.id, patientId, handler, CHECK_IN_INTENTS),
+      new VisitCheckedInEvent(
+        visit.id,
+        patientId,
+        handler,
+        intents,
+        entity.preferredDoctorId ?? null,
+      ),
     );
 
     return visit;
+  }
+
+  findActiveFor(patientId: string): Promise<Visit | null> {
+    return findActiveVisit(this.visitsRepository.manager, patientId);
   }
 
   // Two emergency check-ins in the same second can pick the same number; the unique index decides and we retry.
@@ -198,7 +220,11 @@ export class VisitsService extends BaseCrudService<Visit> {
   }
 
   // Reception is recorded as a finished first stage so waits are measured from registration.
-  private checkInEntries(visit: Visit, handler: string): QueueEntry[] {
+  private checkInEntries(
+    visit: Visit,
+    handler: string,
+    intents: readonly VisitIntenentsEnum[],
+  ): QueueEntry[] {
     const now = new Date();
     const visitId = visit.id;
     const reception = this.queueEntriesRepository.create({
@@ -212,7 +238,7 @@ export class VisitsService extends BaseCrudService<Visit> {
       startedAt: now,
       completedAt: now,
     });
-    const next = CHECK_IN_INTENTS.map((intent, index) =>
+    const next = intents.map((intent, index) =>
       this.queueEntriesRepository.create({
         visitId,
         department: intentDepartmentMap[intent],

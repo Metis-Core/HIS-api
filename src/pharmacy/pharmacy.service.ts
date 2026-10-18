@@ -10,6 +10,7 @@ import { DataSource, In, Repository } from 'typeorm';
 import { BaseCrudService } from 'common/services/crud.service';
 import { IPagination } from 'common/response-format';
 import { Department } from 'common/enums/department.enum';
+import { Consultation } from 'src/consultation/entities/consultation.entity';
 import { InventoryStockService } from 'src/inventory/inventory-stock.service';
 import { InventoryItem } from 'src/inventory/entities/inventory-item.entity';
 import { InventoryTransaction } from 'src/inventory/entities/inventory-transaction.entity';
@@ -28,6 +29,7 @@ import { Prescription } from './entities/prescription.entity';
 import { PrescriptionItemStatus } from './enums/prescription-item-status.enum';
 import { PrescriptionStatus } from './enums/prescription-status.enum';
 import { PrescriptionDispensedEvent } from './events/prescription-dispensed.event';
+import { PrescriptionCancelledEvent } from './events/prescription-cancelled.event';
 import { PrescriptionCreatedEvent } from './events/prescription-created.event';
 import { PaginationQueryDTO, pageWindow, toPage } from 'common/pagination';
 import { wherePatientMatches } from 'common/utils/query-list';
@@ -115,9 +117,21 @@ export class PharmacyService extends BaseCrudService<Prescription> {
       return full;
     });
 
+    const visitId = dto.visitId ?? (await this.visitOf(created.consultationId));
     this.eventEmitter.emit(
       PrescriptionCreatedEvent.name,
-      new PrescriptionCreatedEvent(created.id, created.patientId, prescribedById, created.items.length),
+      new PrescriptionCreatedEvent(
+        created.id,
+        created.patientId,
+        prescribedById,
+        created.items.length,
+        visitId,
+        created.items.map((line) => ({
+          name: line.item.name,
+          quantity: line.quantity,
+          unitPrice: line.item.unitPrice,
+        })),
+      ),
     );
     return created;
   }
@@ -183,7 +197,7 @@ export class PharmacyService extends BaseCrudService<Prescription> {
       throw new BadRequestException('Fully dispensed prescriptions cannot be cancelled');
     }
 
-    return this.dataSource.transaction(async (manager) => {
+    await this.dataSource.transaction(async (manager) => {
       prescription.status = PrescriptionStatus.CANCELLED;
       if (reason) prescription.notes = reason;
       await manager.save(prescription);
@@ -192,8 +206,18 @@ export class PharmacyService extends BaseCrudService<Prescription> {
         { prescriptionId: id, status: In([PrescriptionItemStatus.PENDING, PrescriptionItemStatus.PARTIAL]) },
         { status: PrescriptionItemStatus.CANCELLED },
       );
-      return this.findOne(id);
     });
+    this.eventEmitter.emit(PrescriptionCancelledEvent.channel, new PrescriptionCancelledEvent(id));
+    return this.findOne(id);
+  }
+
+  private async visitOf(consultationId: string | null): Promise<string | null> {
+    if (!consultationId) return null;
+    const consultation = await this.dataSource.manager.findOne(Consultation, {
+      where: { id: consultationId },
+      select: { id: true, visitId: true },
+    });
+    return consultation?.visitId ?? null;
   }
 
   async dispense(

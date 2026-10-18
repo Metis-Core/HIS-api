@@ -1,4 +1,6 @@
 import { Admission } from 'src/admissions/entities/admission.entity';
+import { ClinicRecord } from 'src/clinic/entities/clinic-record.entity';
+import { Message } from 'src/messages/entities/message.entity';
 import { AuditLog } from 'src/auditLogs/entities/audit-log.entity';
 import { AuthToken } from 'src/auth/entities/auth-token.entity';
 import { AvailabilityPeriod } from 'src/availability/entities/availability-period.entity';
@@ -18,6 +20,7 @@ import { LabResultAmendment } from 'src/lab/entities/lab-result-amendment.entity
 import { LabTest } from 'src/lab/entities/lab-test.entity';
 import { Notification } from 'src/notifications/entities/notification.entity';
 import { ProcedureOrder } from 'src/orders/entities/procedure-order.entity';
+import { ProcedureTest } from 'src/orders/entities/procedure-test.entity';
 import { DayClosing } from 'src/payments/entities/day-closing.entity';
 import { Invoice } from 'src/payments/entities/invoice.entity';
 import { Payment } from 'src/payments/entities/payment.entity';
@@ -48,10 +51,13 @@ export const entities = [
   ConsultationDiagnosis,
   DiagnosisCode,
   Admission,
+  ClinicRecord,
+  Message,
   OneTimePassword,
   Service,
   Notification,
   ProcedureOrder,
+  ProcedureTest,
   Invoice,
   Payment,
   DayClosing,

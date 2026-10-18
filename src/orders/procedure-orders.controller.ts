@@ -24,7 +24,7 @@ export class ProcedureOrdersController {
   constructor(private readonly orders: ProcedureOrdersService) {}
 
   @Post()
-  @Roles(RoleGroups.PROVIDERS)
+  @Roles(RoleGroups.PROCEDURE_ORDERERS)
   async place(
     @Body() dto: CreateProcedureOrderDto,
     @CurrentUser() user: AuthenticatedUser,

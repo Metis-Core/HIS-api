@@ -71,6 +71,10 @@ export class ServicesService extends BaseCrudService<Service> {
     return toPage(items, total, window);
   }
 
+  findActiveByCode(code: string): Promise<Service | null> {
+    return this.servicesRepository.findOne({ where: { code, isActive: true } });
+  }
+
   async findConsultationService(): Promise<Service | null> {
     const byCode = await this.servicesRepository.findOne({
       where: { code: ServiceCode.CONSULTATION, isActive: true },

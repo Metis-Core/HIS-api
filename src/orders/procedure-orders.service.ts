@@ -15,16 +15,18 @@ import { Department } from 'common/enums/department.enum';
 import { UserRole } from 'common/enums/userRoles.enum';
 import { containsPattern } from 'common/utils/like-pattern';
 import { Consultation } from 'src/consultation/entities/consultation.entity';
+import { patientContext } from 'src/lab/results/patient-context';
 import { PatientsService } from 'src/patients/patients.service';
 import { Visit } from 'src/queue/entities/visit.entity';
 import { VisitIntenentsEnum } from 'src/queue/enums/visit-type.enum';
 import { canActOnStage } from 'src/queue/journey/department-access.policy';
 import { QueueEntriesService } from 'src/queue/queue-entries.service';
-import { ServicesService } from 'src/services/services.service';
+import { buildCompletion } from './complete-order';
 import { CreateProcedureOrderDto } from './dto/create-procedure-order.dto';
 import { QueryProcedureOrdersDto } from './dto/query-procedure-orders.dto';
 import { UpdateOrderStatusDto } from './dto/update-order-status.dto';
 import { ProcedureOrder } from './entities/procedure-order.entity';
+import { ProcedureTest } from './entities/procedure-test.entity';
 import { OrderKind } from './enums/order-kind.enum';
 import { OrderStatus } from './enums/order-status.enum';
 import {
@@ -46,8 +48,6 @@ const KIND_INTENT: Record<OrderKind, VisitIntenentsEnum> = {
   [OrderKind.SURGERY]: VisitIntenentsEnum.SURGERY,
 };
 
-const MIN_REPORT_LENGTH = 3;
-
 export interface OrderActor {
   id: string;
   role: UserRole;
@@ -60,12 +60,13 @@ export class ProcedureOrdersService extends BaseCrudService<ProcedureOrder> {
   constructor(
     @InjectRepository(ProcedureOrder)
     private readonly orders: Repository<ProcedureOrder>,
+    @InjectRepository(ProcedureTest)
+    private readonly tests: Repository<ProcedureTest>,
     @InjectRepository(Visit)
     private readonly visits: Repository<Visit>,
     @InjectRepository(Consultation)
     private readonly consultations: Repository<Consultation>,
     private readonly patients: PatientsService,
-    private readonly services: ServicesService,
     private readonly queueEntries: QueueEntriesService,
     private readonly events: EventEmitter2,
   ) {
@@ -78,15 +79,21 @@ export class ProcedureOrdersService extends BaseCrudService<ProcedureOrder> {
   ): Promise<ProcedureOrder> {
     await this.patients.findOne(dto.patientId);
     await this.assertLinks(dto);
-    if (dto.serviceId) await this.services.findOne(dto.serviceId);
+    const test = await this.tests.findOne({ where: { id: dto.testId } });
+    if (!test) throw new NotFoundException('Test not found in the catalogue');
+    if (!test.isActive) {
+      throw new BadRequestException(
+        `${test.name} is not active and cannot be ordered`,
+      );
+    }
     const saved = await this.orders.save(
       this.orders.create({
         patientId: dto.patientId,
         visitId: dto.visitId ?? null,
         consultationId: dto.consultationId ?? null,
-        serviceId: dto.serviceId ?? null,
-        kind: dto.kind,
-        name: dto.name.trim(),
+        testId: test.id,
+        kind: test.kind,
+        name: test.name,
         priority: dto.priority,
         indication: dto.indication?.trim() || null,
         orderedById,
@@ -99,7 +106,7 @@ export class ProcedureOrdersService extends BaseCrudService<ProcedureOrder> {
         saved.visitId,
         saved.kind,
         saved.name,
-        saved.serviceId,
+        test.price,
         orderedById,
       ),
     );
@@ -114,7 +121,7 @@ export class ProcedureOrdersService extends BaseCrudService<ProcedureOrder> {
         patient: true,
         orderedBy: true,
         performedBy: true,
-        service: true,
+        test: true,
       },
     });
     if (!order) throw new NotFoundException('Order not found');
@@ -130,17 +137,15 @@ export class ProcedureOrdersService extends BaseCrudService<ProcedureOrder> {
       .createQueryBuilder('o')
       .leftJoinAndSelect('o.patient', 'patient')
       .leftJoinAndSelect('o.orderedBy', 'orderedBy')
-      .leftJoinAndSelect('o.service', 'service');
+      .leftJoinAndSelect('o.test', 'test');
     if (query.kind) qb.andWhere('o.kind = :kind', { kind: query.kind });
     if (query.status?.length) {
       qb.andWhere('o.status IN (:...statuses)', { statuses: query.status });
     }
-    if (query.patientId) {
+    if (query.patientId)
       qb.andWhere('o.patientId = :patientId', { patientId: query.patientId });
-    }
-    if (query.visitId) {
+    if (query.visitId)
       qb.andWhere('o.visitId = :visitId', { visitId: query.visitId });
-    }
     if (query.search?.trim()) {
       qb.andWhere(
         `(o.name ILIKE :term OR patient.mrn ILIKE :term OR patient.firstName ILIKE :term OR patient.lastName ILIKE :term)`,
@@ -160,8 +165,7 @@ export class ProcedureOrdersService extends BaseCrudService<ProcedureOrder> {
     dto: UpdateOrderStatusDto,
     actor: OrderActor,
   ): Promise<ProcedureOrder> {
-    const order = await this.orders.findOne({ where: { id } });
-    if (!order) throw new NotFoundException('Order not found');
+    const order = await this.details(id);
     if (!canActOnStage(actor.role, KIND_DEPARTMENT[order.kind])) {
       throw new ForbiddenException(
         `Role '${actor.role}' cannot work on ${order.kind} orders`,
@@ -204,14 +208,18 @@ export class ProcedureOrdersService extends BaseCrudService<ProcedureOrder> {
         order.performedById = actor.id;
         break;
       case OrderStatus.COMPLETED:
-        if ((dto.report?.trim().length ?? 0) < MIN_REPORT_LENGTH) {
-          throw new BadRequestException(
-            order.kind === OrderKind.RADIOLOGY
-              ? 'Write the findings before completing the study'
-              : 'Write the operation notes before completing the procedure',
-          );
-        }
-        order.report = dto.report!.trim();
+        Object.assign(
+          order,
+          buildCompletion({
+            kind: order.kind,
+            schema: order.test.resultSchema,
+            resultData: dto.resultData,
+            classification: dto.classification,
+            impression: dto.impression,
+            report: dto.report,
+            patient: patientContext(order.patient, new Date()),
+          }),
+        );
         order.performedById = order.performedById ?? actor.id;
         order.completedAt = new Date();
         break;

@@ -16,6 +16,8 @@ import { AuthModule } from './auth/auth.module';
 import { AvailabilityModule } from './availability/availability.module';
 import { ConsultationModule } from './consultation/consultation.module';
 import { ContactsModule } from './contacts/contacts.module';
+import { MessagesModule } from './messages/messages.module';
+import { ClinicModule } from './clinic/clinic.module';
 import { AdmissionsModule } from './admissions/admissions.module';
 import { DiagnosesModule } from './diagnoses/diagnoses.module';
 import { DoctorsModule } from './doctors/doctors.module';
@@ -56,6 +58,8 @@ import { DocumentsModule } from './documents/documents.module';
     ConsultationModule,
     DiagnosesModule,
     AdmissionsModule,
+    ClinicModule,
+    MessagesModule,
     QueueModule,
     ContactsModule,
     OtpModule,

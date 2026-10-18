@@ -1,5 +1,6 @@
 import { ConflictException, ForbiddenException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { UserRole } from 'common/enums/userRoles.enum';
 import { AdmissionsService } from 'src/admissions/admissions.service';
@@ -44,6 +45,7 @@ describe('ConsultationLifecycleService', () => {
         { provide: ConsultationService, useValue: consultations },
         { provide: QueueEntriesService, useValue: queueEntries },
         { provide: AdmissionsService, useValue: { admit: jest.fn() } },
+        { provide: EventEmitter2, useValue: { emit: jest.fn() } },
       ],
     }).compile();
     service = module.get(ConsultationLifecycleService);

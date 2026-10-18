@@ -29,8 +29,14 @@ export class AvailabilityController {
 
   @Get('staff')
   @Roles(RoleGroups.FLOOR_STAFF)
-  async listStaff(@Query() query: QueryStaffAvailabilityDto) {
-    return formatResponse(await this.staff.search(query));
+  async listStaff(
+    @Query() query: QueryStaffAvailabilityDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    const everyone =
+      query.includeInactive === true &&
+      RoleGroups.ADMINS.roles.includes(user.role);
+    return formatResponse(await this.staff.search(query, everyone));
   }
 
   @Get('me')

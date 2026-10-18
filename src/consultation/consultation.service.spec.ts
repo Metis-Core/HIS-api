@@ -5,6 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { UserRole } from 'common/enums/userRoles.enum';
 import { DoctorAssignmentService } from 'src/doctors/doctor-assignment.service';
@@ -55,6 +56,7 @@ describe('ConsultationService', () => {
         { provide: ConsultationReferencesService, useValue: references },
         { provide: ConsultationDiagnosesService, useValue: diagnoses },
         { provide: DoctorAssignmentService, useValue: assignment },
+        { provide: EventEmitter2, useValue: { emit: jest.fn() } },
       ],
     }).compile();
     service = module.get(ConsultationService);

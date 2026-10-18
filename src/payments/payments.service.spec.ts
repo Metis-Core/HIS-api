@@ -77,12 +77,10 @@ describe('PaymentsService', () => {
   });
 
   it('bills a radiology order at its service fee and refreshes the invoice', async () => {
-    servicesService.findOne.mockResolvedValue({ id: 's9', fee: 60000 });
-
     const charge = await service.addProcedureCharge(
       'v1',
       ChargeSource.RADIOLOGY,
-      { id: 'o1', name: 'Chest X-ray', serviceId: 's9' },
+      { id: 'o1', name: 'Chest X-ray', price: 60000 },
       'u1',
     );
 

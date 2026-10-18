@@ -15,7 +15,10 @@ import { Prescription } from 'src/pharmacy/entities/prescription.entity';
 import { PrescriptionStatus } from 'src/pharmacy/enums/prescription-status.enum';
 import { PrescriptionCreatedEvent } from 'src/pharmacy/events/prescription-created.event';
 import { PrescriptionDispensedEvent } from 'src/pharmacy/events/prescription-dispensed.event';
+import { MessageSentEvent } from 'src/messages/events/message-sent.event';
+import { MESSAGE_TEAMS } from 'src/messages/message-teams';
 import { DoctorAssignedEvent } from 'src/doctors/events/doctor-assigned.event';
+import { DoctorRequestUnavailableEvent } from 'src/doctors/events/doctor-request-unavailable.event';
 import { QueueEntry } from 'src/queue/entities/queue-entry.entity';
 import { QueueEntryStatus } from 'src/queue/enums/queue-entry-status.enum';
 import { Visit } from 'src/queue/entities/visit.entity';
@@ -159,8 +162,12 @@ export class WorkflowNotificationsListener {
       await this.dispatcher.toUsers([event.doctorId], {
         type: NotificationType.QUEUE,
         priority: NotificationPriority.HIGH,
-        title: 'Patient assigned to you',
-        body: `${patient} has been assigned to you for consultation.`,
+        title: event.requested
+          ? 'A patient asked for you'
+          : 'Patient assigned to you',
+        body: event.requested
+          ? `${patient} asked to be seen by you.`
+          : `${patient} has been assigned to you for consultation.`,
         actionUrl: `/queue/${event.visitId}`,
         resourceType: 'visit',
         resourceId: event.visitId,
@@ -176,6 +183,43 @@ export class WorkflowNotificationsListener {
           resourceId: event.visitId,
         });
       }
+    });
+  }
+
+  @OnEvent(MessageSentEvent.channel, { async: true })
+  async onMessageSent(event: MessageSentEvent) {
+    await this.safely('message', async () => {
+      await this.dispatcher.toUsers([event.recipientId], {
+        type: NotificationType.MESSAGE,
+        priority: NotificationPriority.NORMAL,
+        title: event.team
+          ? `${event.senderName} to ${MESSAGE_TEAMS[event.team].label}`
+          : `Message from ${event.senderName}`,
+        body: event.preview,
+        actionUrl: event.team
+          ? `/messages?team=${event.team}`
+          : `/messages?with=${event.senderId}`,
+        resourceType: 'message',
+        resourceId: event.messageId,
+      });
+    });
+  }
+
+  @OnEvent(DoctorRequestUnavailableEvent.channel, { async: true })
+  async onDoctorRequestUnavailable(event: DoctorRequestUnavailableEvent) {
+    await this.safely('doctor request unavailable', async () => {
+      const patient = await this.patientLabelForVisit(event.visitId);
+      await this.dispatcher.toUsers([event.checkedInById], {
+        type: NotificationType.QUEUE,
+        priority: NotificationPriority.HIGH,
+        title: 'Requested doctor is not available',
+        body: event.assignedDoctorId
+          ? `${patient} asked for a doctor who cannot take patients now; another doctor was given the patient.`
+          : `${patient} asked for a doctor who cannot take patients now, and no other doctor is available.`,
+        actionUrl: `/queue/${event.visitId}`,
+        resourceType: 'visit',
+        resourceId: event.visitId,
+      });
     });
   }
 

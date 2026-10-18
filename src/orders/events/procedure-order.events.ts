@@ -8,7 +8,7 @@ export class ProcedureOrderedEvent {
     readonly visitId: string | null,
     readonly kind: OrderKind,
     readonly name: string,
-    readonly serviceId: string | null,
+    readonly price: number,
     readonly orderedById: string,
   ) {}
 }

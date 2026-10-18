@@ -6,6 +6,7 @@ import { TriageStatus } from 'src/traige/enums/triage-status.enum';
 import { PatientsService } from 'src/patients/patients.service';
 import { QueueEntriesService } from 'src/queue/queue-entries.service';
 import { VisitsService } from 'src/queue/visit.service';
+import { wantsConsultation } from 'src/queue/journey/check-in-plan';
 import { categoryForAcuity } from 'src/queue/journey/visit-priority';
 import { DoctorAssignmentService } from 'src/doctors/doctor-assignment.service';
 import { UsersService } from 'src/users/users.service';
@@ -330,6 +331,9 @@ export class TraigeService extends BaseCrudService<Triage> {
 
   private async syncVisitQueue(visitId: string): Promise<void> {
     await this.queueEntries.completeCurrentFor(visitId, Department.TRIAGE);
+    // A patient who came only for other services is not sent to a doctor by triage.
+    const visit = await this.visits.findByStringId(visitId);
+    if (!wantsConsultation(visit.metadata)) return;
     await this.queueEntries.ensureIntent(
       visitId,
       VisitIntenentsEnum.CONSULTATION,

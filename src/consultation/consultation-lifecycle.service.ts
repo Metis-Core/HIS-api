@@ -3,9 +3,11 @@ import {
   ConflictException,
   Injectable,
 } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { AdmissionsService } from 'src/admissions/admissions.service';
+import { PatientAdmittedEvent } from 'src/admissions/events/patient-admitted.event';
 import { VisitIntenentsEnum } from 'src/queue/enums/visit-type.enum';
 import { QueueEntry } from 'src/queue/entities/queue-entry.entity';
 import { QueueEntriesService } from 'src/queue/queue-entries.service';
@@ -33,6 +35,7 @@ export class ConsultationLifecycleService {
     private readonly consultations: ConsultationService,
     private readonly queueEntries: QueueEntriesService,
     private readonly admissions: AdmissionsService,
+    private readonly events: EventEmitter2,
   ) {}
 
   async complete(
@@ -56,16 +59,29 @@ export class ConsultationLifecycleService {
     consultation.status = ConsultationStatus.COMPLETED;
     consultation.completedAt = new Date();
     consultation.completionNotes = dto.notes?.trim() || null;
-    await this.consultationsRepository.manager.transaction(async (manager) => {
-      await manager.save(consultation);
-      if (!dto.admission) return;
-      await this.admissions.admit(manager, dto.admission, {
-        patientId: consultation.patientId,
-        visitId: consultation.visitId ?? null,
-        consultationId: consultation.id,
-        admittedById: actor.id,
-      });
-    });
+    const admission = await this.consultationsRepository.manager.transaction(
+      async (manager) => {
+        await manager.save(consultation);
+        if (!dto.admission) return null;
+        return this.admissions.admit(manager, dto.admission, {
+          patientId: consultation.patientId,
+          visitId: consultation.visitId ?? null,
+          consultationId: consultation.id,
+          admittedById: actor.id,
+        });
+      },
+    );
+    if (admission) {
+      this.events.emit(
+        PatientAdmittedEvent.channel,
+        new PatientAdmittedEvent(
+          admission.id,
+          admission.visitId,
+          admission.patientId,
+          actor.id,
+        ),
+      );
+    }
     const queueUpdate = await this.handOff(consultation, dto);
     return { consultation: await this.consultations.findOne(id), queueUpdate };
   }

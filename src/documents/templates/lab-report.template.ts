@@ -28,9 +28,9 @@ const fullName = (p: Patient) =>
   [p.firstName, p.middleName, p.lastName].filter(Boolean).join(' ');
 
 const orderSection = (order: LabOrder, input: LabReportInput) => `
-  <mj-section padding="10px 24px 0">
+  <mj-section padding="10px 32px 0">
     <mj-column>
-      <mj-text font-size="12px" font-weight="700" color="#0E6B5C">
+      <mj-text font-size="12px" font-weight="700" color="#111827">
         Order ${escape(order.id.slice(0, 8))} · ${escape(formatDate(order.createdAt))} · requested by ${escape(order.referringClinician || order.orderedBy?.username || '—')}
       </mj-text>
       ${order.clinicalNotes ? `<mj-text class="muted">Clinical notes: ${escape(order.clinicalNotes)}</mj-text>` : ''}
@@ -57,10 +57,10 @@ export function renderLabReport(input: LabReportInput): string {
         ${documentHeader(preliminary ? 'Preliminary Lab Report' : 'Laboratory Report')}
         ${
           preliminary
-            ? `<mj-section background-color="#FDECEA" padding="8px 24px"><mj-column><mj-text align="center" class="abnormal">PRELIMINARY: some results are not yet verified and may change.</mj-text></mj-column></mj-section>`
+            ? `<mj-section padding="8px 32px"><mj-column><mj-text align="center" class="abnormal">PRELIMINARY: some results are not yet verified and may change.</mj-text></mj-column></mj-section>`
             : ''
         }
-        <mj-section padding="18px 24px">
+        <mj-section padding="18px 32px">
           <mj-column>
             <mj-table>
               <tr class="row"><td class="k">Patient</td><td class="v">${escape(fullName(patient))}</td><td class="k">MRN</td><td class="v">${escape(patient.mrn ?? '—')}</td></tr>
@@ -69,7 +69,7 @@ export function renderLabReport(input: LabReportInput): string {
           </mj-column>
         </mj-section>
         ${orders.map((order) => orderSection(order, input)).join('')}
-        <mj-section padding="8px 24px 0"><mj-column><mj-text class="muted">${escape(FLAG_LEGEND)}</mj-text></mj-column></mj-section>
+        <mj-section padding="8px 32px 0"><mj-column><mj-text class="muted">${escape(FLAG_LEGEND)}</mj-text></mj-column></mj-section>
         ${signatureBlock(orders)}
         ${documentFooter()}
       </mj-body>
