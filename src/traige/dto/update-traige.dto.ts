@@ -12,7 +12,6 @@ import {
   Min,
   ValidateIf,
 } from 'class-validator';
-import { Department } from 'common/enums/department.enum';
 import { ConsciousnessLevel } from 'src/traige/enums/consciousness-level.enum';
 import { TriageAcuity } from 'src/traige/enums/triage-acuity.enum';
 import { TriageStatus } from 'src/traige/enums/triage-status.enum';
@@ -124,11 +123,6 @@ export class UpdateTriageDto {
   @IsOptional()
   @IsString()
   allergiesNoted?: string | null;
-
-  @ValidateIf((_, value) => value !== null)
-  @IsOptional()
-  @IsEnum(Department)
-  referredToDepartment?: Department | null;
 
   @IsOptional()
   @IsDateString()

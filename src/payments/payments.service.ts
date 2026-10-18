@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { BaseCrudService } from 'common/services/crud.service';
 import { ServicesService } from 'src/services/services.service';
+import { InvoicesService } from './invoices.service';
 import { CreateVisitChargeDto } from './dto/create-visit-charge.dto';
 import { VisitCharge } from './entities/visit-charge.entity';
 import { ChargeSource, ChargeStatus } from './enums/charge.enum';
@@ -19,6 +20,7 @@ export class PaymentsService extends BaseCrudService<VisitCharge> {
     @InjectRepository(VisitCharge)
     private readonly charges: Repository<VisitCharge>,
     private readonly servicesService: ServicesService,
+    private readonly invoices: InvoicesService,
   ) {
     super(charges);
   }
@@ -38,7 +40,10 @@ export class PaymentsService extends BaseCrudService<VisitCharge> {
     };
   }
 
-  async addCharge(dto: CreateVisitChargeDto, addedById: string | null): Promise<VisitCharge> {
+  async addCharge(
+    dto: CreateVisitChargeDto,
+    addedById: string | null,
+  ): Promise<VisitCharge> {
     const quantity = dto.quantity ?? 1;
     if (dto.serviceId) {
       const service = await this.servicesService.findOne(dto.serviceId);
@@ -63,7 +68,14 @@ export class PaymentsService extends BaseCrudService<VisitCharge> {
     });
   }
 
-  async addConsultationFee(visitId: string, addedById: string): Promise<VisitCharge | null> {
+  async addConsultationFee(
+    visitId: string,
+    addedById: string,
+  ): Promise<VisitCharge | null> {
+    const existing = await this.charges.findOne({
+      where: { visitId, source: ChargeSource.CONSULTATION },
+    });
+    if (existing) return existing;
     const service = await this.servicesService.findConsultationService();
     if (!service) return null;
     return this.record({
@@ -75,6 +87,51 @@ export class PaymentsService extends BaseCrudService<VisitCharge> {
       quantity: 1,
       addedById,
     });
+  }
+
+  /** Bills a priced service looked up by its code; a fee of 0 is recorded as a free line. */
+  async addServiceFee(
+    visitId: string,
+    code: string,
+    addedById: string,
+  ): Promise<VisitCharge | null> {
+    const service = await this.servicesService.findActiveByCode(code);
+    if (!service) return null;
+    return this.record({
+      visitId,
+      source: ChargeSource.SERVICE,
+      referenceId: service.id,
+      description: service.name,
+      unitPrice: service.fee,
+      quantity: 1,
+      addedById,
+    });
+  }
+
+  async addPrescriptionCharges(
+    visitId: string,
+    prescriptionId: string,
+    lines: readonly { name: string; quantity: number; unitPrice: number }[],
+    addedById: string,
+  ): Promise<VisitCharge[]> {
+    const priced = lines.filter((line) => line.unitPrice > 0);
+    if (priced.length === 0) return [];
+    const saved = await this.charges.save(
+      priced.map((line) =>
+        this.charges.create({
+          visitId,
+          source: ChargeSource.PHARMACY,
+          referenceId: prescriptionId,
+          description: line.name,
+          unitPrice: line.unitPrice,
+          quantity: line.quantity,
+          amount: line.unitPrice * line.quantity,
+          addedById,
+        }),
+      ),
+    );
+    await this.invoices.syncForVisit(visitId);
+    return saved;
   }
 
   async addLabCharges(
@@ -94,13 +151,43 @@ export class PaymentsService extends BaseCrudService<VisitCharge> {
         addedById,
       }),
     );
-    return this.charges.save(rows);
+    const saved = await this.charges.save(rows);
+    await this.invoices.syncForVisit(visitId);
+    return saved;
+  }
+
+  async addProcedureCharge(
+    visitId: string,
+    source: ChargeSource.RADIOLOGY | ChargeSource.SURGERY,
+    order: { id: string; name: string; price: number },
+    addedById: string,
+  ): Promise<VisitCharge> {
+    return this.record({
+      visitId,
+      source,
+      referenceId: order.id,
+      description: order.name,
+      unitPrice: order.price,
+      quantity: 1,
+      addedById,
+    });
+  }
+
+  async dropPendingChargesFor(referenceId: string): Promise<void> {
+    const pending = await this.charges.find({
+      where: { referenceId, status: ChargeStatus.PENDING },
+    });
+    if (pending.length === 0) return;
+    await this.charges.remove(pending);
+    await this.invoices.syncForVisit(pending[0].visitId);
   }
 
   async setStatus(id: string, status: ChargeStatus): Promise<VisitCharge> {
     const charge = await this.findOne(id);
     charge.status = status;
-    return this.charges.save(charge);
+    const saved = await this.charges.save(charge);
+    await this.invoices.syncForVisit(charge.visitId);
+    return saved;
   }
 
   override async remove(id: string): Promise<void> {
@@ -109,13 +196,28 @@ export class PaymentsService extends BaseCrudService<VisitCharge> {
       throw new BadRequestException('Only pending charges can be removed');
     }
     await super.remove(id);
+    await this.invoices.syncForVisit(charge.visitId);
   }
 
-  private record(
-    charge: Pick<VisitCharge, 'visitId' | 'source' | 'referenceId' | 'description' | 'unitPrice' | 'quantity' | 'addedById'>,
+  private async record(
+    charge: Pick<
+      VisitCharge,
+      | 'visitId'
+      | 'source'
+      | 'referenceId'
+      | 'description'
+      | 'unitPrice'
+      | 'quantity'
+      | 'addedById'
+    >,
   ): Promise<VisitCharge> {
-    return this.charges.save(
-      this.charges.create({ ...charge, amount: charge.unitPrice * charge.quantity }),
+    const saved = await this.charges.save(
+      this.charges.create({
+        ...charge,
+        amount: charge.unitPrice * charge.quantity,
+      }),
     );
+    await this.invoices.syncForVisit(charge.visitId);
+    return saved;
   }
 }

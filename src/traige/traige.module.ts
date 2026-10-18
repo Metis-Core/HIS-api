@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { DoctorsModule } from 'src/doctors/doctors.module';
 import { PatientsModule } from 'src/patients/patients.module';
 import { QueueModule } from 'src/queue/queue.module';
 import { UsersModule } from 'src/users/users.module';
@@ -13,6 +14,7 @@ import { TraigeService } from './traige.service';
     PatientsModule,
     UsersModule,
     QueueModule,
+    DoctorsModule,
   ],
   controllers: [TraigeController],
   providers: [TraigeService],

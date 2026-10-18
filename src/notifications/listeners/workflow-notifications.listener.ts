@@ -1,19 +1,26 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import { Department } from 'common/enums/department.enum';
 import { UserRole } from 'common/enums/userRoles.enum';
 import { LabOrderCancelledEvent } from 'src/lab/events/lab-order-cancelled.event';
 import { LabOrderCompletedEvent } from 'src/lab/events/lab-order-completed.event';
 import { LabOrderCreatedEvent } from 'src/lab/events/lab-order-created.event';
 import { LabResultReadyEvent } from 'src/lab/events/lab-result-ready.event';
+import { LabResultVerifiedEvent } from 'src/lab/events/lab-result-verified.event';
+import { resultPriority, verifiedMessage } from './lab-result-messages';
 import { Patient } from 'src/patients/entities/patient.entity';
 import { Prescription } from 'src/pharmacy/entities/prescription.entity';
 import { PrescriptionStatus } from 'src/pharmacy/enums/prescription-status.enum';
 import { PrescriptionCreatedEvent } from 'src/pharmacy/events/prescription-created.event';
 import { PrescriptionDispensedEvent } from 'src/pharmacy/events/prescription-dispensed.event';
+import { MessageSentEvent } from 'src/messages/events/message-sent.event';
+import { MESSAGE_TEAMS } from 'src/messages/message-teams';
+import { DoctorAssignedEvent } from 'src/doctors/events/doctor-assigned.event';
+import { DoctorRequestUnavailableEvent } from 'src/doctors/events/doctor-request-unavailable.event';
 import { QueueEntry } from 'src/queue/entities/queue-entry.entity';
+import { QueueEntryStatus } from 'src/queue/enums/queue-entry-status.enum';
 import { Visit } from 'src/queue/entities/visit.entity';
 import {
   QueueEntryCalledEvent,
@@ -89,7 +96,10 @@ export class WorkflowNotificationsListener {
   async onVisitCheckedIn(event: VisitCheckedInEvent) {
     await this.safely('visit check-in', async () => {
       const first = await this.queueEntriesRepository.findOne({
-        where: { visitId: event.visitId },
+        where: {
+          visitId: event.visitId,
+          status: In([QueueEntryStatus.WAITING, QueueEntryStatus.CALLED]),
+        },
         order: { sequenceNumber: 'ASC' },
       });
       if (!first) return;
@@ -131,7 +141,9 @@ export class WorkflowNotificationsListener {
     if (event.data.servedById) return;
     await this.safely('queue entry advanced', async () => {
       const { department, visitId, patientId } = event.data;
-      const patient = patientId ? await this.patientLabel(patientId) : await this.patientLabelForVisit(visitId);
+      const patient = patientId
+        ? await this.patientLabel(patientId)
+        : await this.patientLabelForVisit(visitId);
       await this.notifyDepartment(department, {
         type: NotificationType.QUEUE,
         priority: NotificationPriority.HIGH,
@@ -139,6 +151,74 @@ export class WorkflowNotificationsListener {
         body: `${patient} has finished the previous stage and is ready for ${DEPARTMENT_LABEL[department]}.`,
         resourceType: 'visit',
         resourceId: visitId,
+      });
+    });
+  }
+
+  @OnEvent(DoctorAssignedEvent.channel, { async: true })
+  async onDoctorAssigned(event: DoctorAssignedEvent) {
+    await this.safely('doctor assigned', async () => {
+      const patient = await this.patientLabelForVisit(event.visitId);
+      await this.dispatcher.toUsers([event.doctorId], {
+        type: NotificationType.QUEUE,
+        priority: NotificationPriority.HIGH,
+        title: event.requested
+          ? 'A patient asked for you'
+          : 'Patient assigned to you',
+        body: event.requested
+          ? `${patient} asked to be seen by you.`
+          : `${patient} has been assigned to you for consultation.`,
+        actionUrl: `/queue/${event.visitId}`,
+        resourceType: 'visit',
+        resourceId: event.visitId,
+      });
+      if (event.previousDoctorId) {
+        await this.dispatcher.toUsers([event.previousDoctorId], {
+          type: NotificationType.QUEUE,
+          priority: NotificationPriority.NORMAL,
+          title: 'Patient moved to another doctor',
+          body: `${patient} is no longer on your list.`,
+          actionUrl: '/queue',
+          resourceType: 'visit',
+          resourceId: event.visitId,
+        });
+      }
+    });
+  }
+
+  @OnEvent(MessageSentEvent.channel, { async: true })
+  async onMessageSent(event: MessageSentEvent) {
+    await this.safely('message', async () => {
+      await this.dispatcher.toUsers([event.recipientId], {
+        type: NotificationType.MESSAGE,
+        priority: NotificationPriority.NORMAL,
+        title: event.team
+          ? `${event.senderName} to ${MESSAGE_TEAMS[event.team].label}`
+          : `Message from ${event.senderName}`,
+        body: event.preview,
+        actionUrl: event.team
+          ? `/messages?team=${event.team}`
+          : `/messages?with=${event.senderId}`,
+        resourceType: 'message',
+        resourceId: event.messageId,
+      });
+    });
+  }
+
+  @OnEvent(DoctorRequestUnavailableEvent.channel, { async: true })
+  async onDoctorRequestUnavailable(event: DoctorRequestUnavailableEvent) {
+    await this.safely('doctor request unavailable', async () => {
+      const patient = await this.patientLabelForVisit(event.visitId);
+      await this.dispatcher.toUsers([event.checkedInById], {
+        type: NotificationType.QUEUE,
+        priority: NotificationPriority.HIGH,
+        title: 'Requested doctor is not available',
+        body: event.assignedDoctorId
+          ? `${patient} asked for a doctor who cannot take patients now; another doctor was given the patient.`
+          : `${patient} asked for a doctor who cannot take patients now, and no other doctor is available.`,
+        actionUrl: `/queue/${event.visitId}`,
+        resourceType: 'visit',
+        resourceId: event.visitId,
       });
     });
   }
@@ -168,27 +248,52 @@ export class WorkflowNotificationsListener {
   async onLabOrderCancelled(event: LabOrderCancelledEvent) {
     await this.safely('lab order cancelled', async () => {
       const patient = await this.patientLabel(event.patientId);
-      await this.dispatcher.toRoles(DEPARTMENT_ROLES[Department.MAIN_LABORATORY], {
-        type: NotificationType.LAB_ORDER,
-        priority: NotificationPriority.NORMAL,
-        title: 'Lab order cancelled',
-        body: `The lab order for ${patient} was cancelled.`,
-        actionUrl: '/lab',
-        resourceType: 'lab_order',
-        resourceId: event.orderId,
-      });
+      await this.dispatcher.toRoles(
+        DEPARTMENT_ROLES[Department.MAIN_LABORATORY],
+        {
+          type: NotificationType.LAB_ORDER,
+          priority: NotificationPriority.NORMAL,
+          title: 'Lab order cancelled',
+          body: `The lab order for ${patient} was cancelled.`,
+          actionUrl: '/lab',
+          resourceType: 'lab_order',
+          resourceId: event.orderId,
+        },
+      );
     });
   }
 
+  // Entered results wait for a second look in the lab; the doctor is told only once they are verified (C3).
   @OnEvent(LabResultReadyEvent.name, { async: true })
   async onLabResultReady(event: LabResultReadyEvent) {
-    await this.safely('lab result ready', async () => {
+    await this.safely('lab result awaiting verification', async () => {
       const patient = await this.patientLabel(event.patientId);
+      await this.dispatcher.toRoles(
+        DEPARTMENT_ROLES[Department.MAIN_LABORATORY],
+        {
+          type: NotificationType.LAB_RESULT,
+          priority: NotificationPriority.NORMAL,
+          title: `Awaiting verification: ${event.testName}`,
+          body: `${patient}: the ${event.testName} result was entered and needs verifying.`,
+          actionUrl: '/lab',
+          resourceType: 'lab_order',
+          resourceId: event.orderId,
+        },
+        event.resultedById,
+      );
+    });
+  }
+
+  @OnEvent(LabResultVerifiedEvent.name, { async: true })
+  async onLabResultVerified(event: LabResultVerifiedEvent) {
+    await this.safely('lab result verified', async () => {
+      const patient = await this.patientLabel(event.patientId);
+      const { title, body } = verifiedMessage(event, patient);
       await this.dispatcher.toUsers([event.orderedById], {
         type: NotificationType.LAB_RESULT,
-        priority: event.isAbnormal ? NotificationPriority.CRITICAL : NotificationPriority.HIGH,
-        title: event.isAbnormal ? `Abnormal result: ${event.testName}` : `Result ready: ${event.testName}`,
-        body: `${patient}: ${event.testName} result is in${event.isAbnormal ? ' and flagged abnormal' : ''}. Other tests on this order are still pending.`,
+        priority: resultPriority(event.critical, event.flagged),
+        title,
+        body,
         actionUrl: `/patients/${event.patientId}`,
         resourceType: 'lab_order',
         resourceId: event.orderId,
@@ -200,12 +305,22 @@ export class WorkflowNotificationsListener {
   async onLabOrderCompleted(event: LabOrderCompletedEvent) {
     await this.safely('lab order completed', async () => {
       const patient = await this.patientLabel(event.patientId);
-      const abnormal = event.abnormalCount > 0;
+      const notes = [
+        event.criticalCount ? `${event.criticalCount} critical` : '',
+        event.abnormalCount
+          ? `${event.abnormalCount} outside the reference range`
+          : '',
+      ].filter(Boolean);
       await this.dispatcher.toUsers([event.orderedById], {
         type: NotificationType.LAB_RESULT,
-        priority: abnormal ? NotificationPriority.CRITICAL : NotificationPriority.HIGH,
-        title: abnormal ? 'Lab results ready — abnormal findings' : 'Lab results ready',
-        body: `All results for ${patient} are ready${abnormal ? `; ${event.abnormalCount} flagged abnormal` : ''}.`,
+        priority: resultPriority(
+          event.criticalCount > 0,
+          event.abnormalCount > 0,
+        ),
+        title: event.criticalCount
+          ? 'Lab results verified — critical values'
+          : 'Lab results verified',
+        body: `All results for ${patient} are verified${notes.length ? `; ${notes.join(', ')}` : ''}.`,
         actionUrl: `/patients/${event.patientId}`,
         resourceType: 'lab_order',
         resourceId: event.orderId,
@@ -245,7 +360,9 @@ export class WorkflowNotificationsListener {
       await this.dispatcher.toUsers([prescription.prescribedById], {
         type: NotificationType.PRESCRIPTION,
         priority: NotificationPriority.NORMAL,
-        title: complete ? 'Medication dispensed' : 'Medication partially dispensed',
+        title: complete
+          ? 'Medication dispensed'
+          : 'Medication partially dispensed',
         body: complete
           ? `The prescription for ${patient} has been fully dispensed.`
           : `Part of the prescription for ${patient} has been dispensed; the rest is pending.`,
@@ -273,7 +390,9 @@ export class WorkflowNotificationsListener {
       where: { id: patientId },
       select: { id: true, firstName: true, lastName: true },
     });
-    return patient ? `${patient.firstName} ${patient.lastName}`.trim() : 'A patient';
+    return patient
+      ? `${patient.firstName} ${patient.lastName}`.trim()
+      : 'A patient';
   }
 
   private async patientLabelForVisit(visitId: string): Promise<string> {

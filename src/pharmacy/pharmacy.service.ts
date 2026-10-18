@@ -10,6 +10,7 @@ import { DataSource, In, Repository } from 'typeorm';
 import { BaseCrudService } from 'common/services/crud.service';
 import { IPagination } from 'common/response-format';
 import { Department } from 'common/enums/department.enum';
+import { Consultation } from 'src/consultation/entities/consultation.entity';
 import { InventoryStockService } from 'src/inventory/inventory-stock.service';
 import { InventoryItem } from 'src/inventory/entities/inventory-item.entity';
 import { InventoryTransaction } from 'src/inventory/entities/inventory-transaction.entity';
@@ -28,7 +29,10 @@ import { Prescription } from './entities/prescription.entity';
 import { PrescriptionItemStatus } from './enums/prescription-item-status.enum';
 import { PrescriptionStatus } from './enums/prescription-status.enum';
 import { PrescriptionDispensedEvent } from './events/prescription-dispensed.event';
+import { PrescriptionCancelledEvent } from './events/prescription-cancelled.event';
 import { PrescriptionCreatedEvent } from './events/prescription-created.event';
+import { PaginationQueryDTO, pageWindow, toPage } from 'common/pagination';
+import { wherePatientMatches } from 'common/utils/query-list';
 
 @Injectable()
 export class PharmacyService extends BaseCrudService<Prescription> {
@@ -113,9 +117,21 @@ export class PharmacyService extends BaseCrudService<Prescription> {
       return full;
     });
 
+    const visitId = dto.visitId ?? (await this.visitOf(created.consultationId));
     this.eventEmitter.emit(
       PrescriptionCreatedEvent.name,
-      new PrescriptionCreatedEvent(created.id, created.patientId, prescribedById, created.items.length),
+      new PrescriptionCreatedEvent(
+        created.id,
+        created.patientId,
+        prescribedById,
+        created.items.length,
+        visitId,
+        created.items.map((line) => ({
+          name: line.item.name,
+          quantity: line.quantity,
+          unitPrice: line.item.unitPrice,
+        })),
+      ),
     );
     return created;
   }
@@ -132,8 +148,7 @@ export class PharmacyService extends BaseCrudService<Prescription> {
   }
 
   async search(query: QueryPrescriptionsDto): Promise<IPagination<Prescription>> {
-    const page = query.page ?? 1;
-    const limit = query.limit ?? 20;
+    const window = pageWindow(query);
     const sortOrder = query.sortOrder ?? 'DESC';
 
     const qb = this.prescriptionsRepository
@@ -145,24 +160,34 @@ export class PharmacyService extends BaseCrudService<Prescription> {
     if (query.patientId) qb.andWhere('prescription.patientId = :patientId', { patientId: query.patientId });
     if (query.consultationId) qb.andWhere('prescription.consultationId = :consultationId', { consultationId: query.consultationId });
     if (query.prescribedById) qb.andWhere('prescription.prescribedById = :prescribedById', { prescribedById: query.prescribedById });
-    if (query.status) qb.andWhere('prescription.status = :status', { status: query.status });
+    if (query.status?.length) qb.andWhere('prescription.status IN (:...statuses)', { statuses: query.status });
+    wherePatientMatches(qb, 'patient', query.search);
 
     const [items, total] = await qb
       .orderBy('prescription.createdAt', sortOrder)
-      .skip((page - 1) * limit)
-      .take(limit)
+      // Tie-break on id so rows never repeat or vanish between pages.
+      .addOrderBy('prescription.id', sortOrder)
+      .skip(window.skip)
+      .take(window.take)
       .getManyAndCount();
 
-    return { items, total };
+    return toPage(items, total, window);
   }
 
-  async findByPatient(patientId: string): Promise<Prescription[]> {
+  // Patient history grows for years, so it is paged newest-first like every other list.
+  async findByPatient(
+    patientId: string,
+    query: PaginationQueryDTO = {},
+  ): Promise<IPagination<Prescription>> {
     await this.patientsService.findOne(patientId);
-    return this.prescriptionsRepository.find({
-      where: { patientId },
-      relations: { items: { item: true } },
-      order: { createdAt: 'DESC' },
-    });
+    return this.findPage(
+      {
+        where: { patientId },
+        relations: { items: { item: true } },
+        order: { createdAt: 'DESC', id: 'DESC' },
+      },
+      query,
+    );
   }
 
   async cancelPrescription(id: string, reason?: string): Promise<Prescription> {
@@ -172,7 +197,7 @@ export class PharmacyService extends BaseCrudService<Prescription> {
       throw new BadRequestException('Fully dispensed prescriptions cannot be cancelled');
     }
 
-    return this.dataSource.transaction(async (manager) => {
+    await this.dataSource.transaction(async (manager) => {
       prescription.status = PrescriptionStatus.CANCELLED;
       if (reason) prescription.notes = reason;
       await manager.save(prescription);
@@ -181,8 +206,18 @@ export class PharmacyService extends BaseCrudService<Prescription> {
         { prescriptionId: id, status: In([PrescriptionItemStatus.PENDING, PrescriptionItemStatus.PARTIAL]) },
         { status: PrescriptionItemStatus.CANCELLED },
       );
-      return this.findOne(id);
     });
+    this.eventEmitter.emit(PrescriptionCancelledEvent.channel, new PrescriptionCancelledEvent(id));
+    return this.findOne(id);
+  }
+
+  private async visitOf(consultationId: string | null): Promise<string | null> {
+    if (!consultationId) return null;
+    const consultation = await this.dataSource.manager.findOne(Consultation, {
+      where: { id: consultationId },
+      select: { id: true, visitId: true },
+    });
+    return consultation?.visitId ?? null;
   }
 
   async dispense(
@@ -279,7 +314,20 @@ export class PharmacyService extends BaseCrudService<Prescription> {
         );
         const visitId: string | undefined = consultation?.[0]?.visitId;
         if (visitId) {
-          await this.queueEntries.completeCurrentFor(visitId, Department.MAIN_PHARMACY);
+          const [{ open }] = await manager.query(
+            `SELECT COUNT(*)::int AS open FROM prescriptions p
+             JOIN consultations c ON c.id = p."consultationId"
+             WHERE c."visitId" = $1 AND p.id <> $2 AND p.status IN ($3, $4)`,
+            [
+              visitId,
+              prescriptionId,
+              PrescriptionStatus.PENDING,
+              PrescriptionStatus.PARTIALLY_DISPENSED,
+            ],
+          );
+          if (open === 0) {
+            await this.queueEntries.completeCurrentFor(visitId, Department.MAIN_PHARMACY);
+          }
         }
       }
 

@@ -8,6 +8,9 @@ import {
   escape,
   formatDate,
 } from './shared';
+import { clinicalSections } from './discharge-sections';
+import { isReleased } from 'src/lab/results/release';
+import { summarizeResult } from 'src/lab/results/summarize-result';
 
 interface DischargeContext {
   consultation: Consultation;
@@ -15,10 +18,16 @@ interface DischargeContext {
   prescriptions: Prescription[];
 }
 
-export function renderDischargeSummary({ consultation, labOrders, prescriptions }: DischargeContext): string {
+export function renderDischargeSummary({
+  consultation,
+  labOrders,
+  prescriptions,
+}: DischargeContext): string {
   const patient = consultation.patient;
   const patientName = patient
-    ? [patient.firstName, patient.middleName, patient.lastName].filter(Boolean).join(' ')
+    ? [patient.firstName, patient.middleName, patient.lastName]
+        .filter(Boolean)
+        .join(' ')
     : 'Patient';
   const doctor = consultation.doctor?.username ?? '—';
 
@@ -29,7 +38,7 @@ export function renderDischargeSummary({ consultation, labOrders, prescriptions 
           <tr>
             <td class="cell code">${escape(i.test?.code ?? '')}</td>
             <td class="cell">${escape(i.test?.name ?? '')}</td>
-            <td class="cell">${escape(i.resultValue ?? '—')}</td>
+            <td class="cell">${escape(isReleased(i) ? summarizeResult(i.test, i.resultData) || '—' : 'Awaiting verification')}</td>
             <td class="cell">${escape(formatDate(i.resultedAt))}</td>
           </tr>
         `,
@@ -62,7 +71,7 @@ export function renderDischargeSummary({ consultation, labOrders, prescriptions 
       <mj-body background-color="#FFFFFF">
         ${documentHeader('Discharge Summary')}
 
-        <mj-section padding="18px 24px">
+        <mj-section padding="18px 32px">
           <mj-column>
             <mj-table>
               <tr class="row">
@@ -81,44 +90,17 @@ export function renderDischargeSummary({ consultation, labOrders, prescriptions 
           </mj-column>
         </mj-section>
 
-        <mj-section padding="0 24px">
+        <mj-section padding="0 32px">
           <mj-column>
-            <mj-text class="label">Chief complaint</mj-text>
-            <mj-text>${escape(consultation.chiefComplaint)}</mj-text>
-
-            ${
-              consultation.historyOfPresentIllness
-                ? `<mj-text class="label">History of present illness</mj-text><mj-text>${escape(consultation.historyOfPresentIllness)}</mj-text>`
-                : ''
-            }
-            ${
-              consultation.examinationFindings
-                ? `<mj-text class="label">Examination findings</mj-text><mj-text>${escape(consultation.examinationFindings)}</mj-text>`
-                : ''
-            }
-            ${
-              consultation.assessment
-                ? `<mj-text class="label">Assessment</mj-text><mj-text>${escape(consultation.assessment)}</mj-text>`
-                : ''
-            }
-            ${
-              consultation.diagnosis
-                ? `<mj-text class="label">Diagnosis${consultation.icd10Codes ? ` (${escape(consultation.icd10Codes)})` : ''}</mj-text><mj-text>${escape(consultation.diagnosis)}</mj-text>`
-                : ''
-            }
-            ${
-              consultation.plan
-                ? `<mj-text class="label">Plan</mj-text><mj-text>${escape(consultation.plan)}</mj-text>`
-                : ''
-            }
+            ${clinicalSections(consultation)}
           </mj-column>
         </mj-section>
 
         ${
           labRows
-            ? `<mj-section padding="0 24px">
+            ? `<mj-section padding="0 32px">
                 <mj-column>
-                  <mj-text font-size="12px" font-weight="700" color="#0E6B5C">Laboratory</mj-text>
+                  <mj-text font-size="12px" font-weight="700" color="#111827">Laboratory</mj-text>
                   <mj-table>
                     <tr><th>Code</th><th>Test</th><th>Result</th><th>Reported</th></tr>
                     ${labRows}
@@ -130,9 +112,9 @@ export function renderDischargeSummary({ consultation, labOrders, prescriptions 
 
         ${
           rxRows
-            ? `<mj-section padding="0 24px">
+            ? `<mj-section padding="0 32px">
                 <mj-column>
-                  <mj-text font-size="12px" font-weight="700" color="#0E6B5C">Prescriptions</mj-text>
+                  <mj-text font-size="12px" font-weight="700" color="#111827">Prescriptions</mj-text>
                   <mj-table>
                     <tr><th>Medication</th><th>Dose</th><th>Freq</th><th>Duration</th><th>Qty</th></tr>
                     ${rxRows}

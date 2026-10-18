@@ -10,6 +10,9 @@ export class ServiceResponseDTO {
   name: string;
 
   @Expose()
+  code: string | null;
+
+  @Expose()
   fee: number;
 
   @Expose()

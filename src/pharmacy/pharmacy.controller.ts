@@ -19,6 +19,7 @@ import { CreatePrescriptionDto } from './dto/create-prescription.dto';
 import { DispensePrescriptionDto } from './dto/dispense-prescription.dto';
 import { QueryPrescriptionsDto } from './dto/query-prescriptions.dto';
 import { PharmacyService } from './pharmacy.service';
+import { PaginationQueryDTO } from 'common/pagination';
 
 @Controller('pharmacy')
 export class PharmacyController {
@@ -48,8 +49,11 @@ export class PharmacyController {
 
   @Get('prescriptions/patient/:patientId')
   @Roles(RoleGroups.CLINICAL_STAFF, UserRole.PHARMACIST)
-  findByPatient(@Param('patientId', ParseUUIDPipe) patientId: string) {
-    return this.pharmacyService.findByPatient(patientId);
+  findByPatient(
+    @Param('patientId', ParseUUIDPipe) patientId: string,
+    @Query() query: PaginationQueryDTO,
+  ) {
+    return this.pharmacyService.findByPatient(patientId, query);
   }
 
   @Get('prescriptions/:id')

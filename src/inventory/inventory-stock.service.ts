@@ -16,6 +16,16 @@ import { InventoryTransaction } from './entities/inventory-transaction.entity';
 import { InventoryTransactionType } from './enums/inventoryTransactionType.enum';
 import { QuantityUnit } from './enums/quantity-unit.enum';
 import { StockLowEvent } from './events/stock-low.event';
+import { PaginationQueryDTO, pageWindow, toPage } from 'common/pagination';
+import { QueryInventoryStockDTO } from './dto/query-inventory-stock.dto';
+import {
+  assertItemInScope,
+  assertStoreInScope,
+  FULL_INVENTORY_SCOPE,
+  InventoryScope,
+  scopeItems,
+  scopeStores,
+} from './inventory-scope.policy';
 
 const NEGATIVE_TXN_TYPES = new Set<InventoryTransactionType>([
   InventoryTransactionType.ISSUE,
@@ -46,15 +56,47 @@ export class InventoryStockService {
     private readonly eventEmitter: EventEmitter2,
   ) {}
 
-  async getStockLevels(storeId?: string): Promise<InventoryStock[]> {
-    return this.stockRepository.find({
-      where: storeId ? { storeId } : {},
-      relations: { store: true, item: true },
-      order: { updatedAt: 'DESC' },
-    });
+  /** Stock rows A→Z by item name (a reference list), optionally narrowed to a store, items or a search. */
+  async getStockLevels(
+    query: QueryInventoryStockDTO = {},
+    scope: InventoryScope = FULL_INVENTORY_SCOPE,
+  ): Promise<IPagination<InventoryStock>> {
+    const window = pageWindow(query);
+    const sortOrder = query.sortOrder ?? 'ASC';
+    const qb = this.stockRepository
+      .createQueryBuilder('stock')
+      .innerJoinAndSelect('stock.item', 'item')
+      .innerJoinAndSelect('stock.store', 'store');
+    scopeItems(qb, 'item', scope);
+    scopeStores(qb, 'store', scope);
+    if (query.storeId) {
+      qb.andWhere('stock.storeId = :storeId', { storeId: query.storeId });
+    }
+    if (query.itemIds?.length) {
+      qb.andWhere('stock.itemId IN (:...itemIds)', { itemIds: query.itemIds });
+    }
+    if (query.search?.trim()) {
+      const term = `%${query.search.trim().toLowerCase()}%`;
+      qb.andWhere(
+        '(LOWER(item.name) LIKE :term OR LOWER(item.sku) LIKE :term)',
+        { term },
+      );
+    }
+    const [items, total] = await qb
+      .orderBy('item.name', sortOrder)
+      .addOrderBy('store.name', 'ASC')
+      .addOrderBy('stock.id', 'ASC')
+      .skip(window.skip)
+      .take(window.take)
+      .getManyAndCount();
+    return toPage(items, total, window);
   }
 
-  async getStockFor(storeId: string, itemId: string): Promise<InventoryStock> {
+  async getStockFor(
+    storeId: string,
+    itemId: string,
+    scope: InventoryScope = FULL_INVENTORY_SCOPE,
+  ): Promise<InventoryStock> {
     const stock = await this.stockRepository.findOne({
       where: { storeId, itemId },
       relations: { store: true, item: true },
@@ -62,6 +104,8 @@ export class InventoryStockService {
     if (!stock) {
       throw new NotFoundException('Stock record not found');
     }
+    assertItemInScope(scope, stock.item);
+    assertStoreInScope(scope, stock.store);
     return stock;
   }
 
@@ -69,12 +113,15 @@ export class InventoryStockService {
     dto: CreateInventoryTransactionDto,
     performedById: string,
     manager?: EntityManager,
+    scope: InventoryScope = FULL_INVENTORY_SCOPE,
   ): Promise<InventoryTransaction> {
     if (manager) {
       // Caller owns the transaction and must call notifyIfLow() after it commits.
-      return this.record(manager, dto, performedById);
+      return this.record(manager, dto, performedById, scope);
     }
-    const txn = await this.dataSource.transaction((m) => this.record(m, dto, performedById));
+    const txn = await this.dataSource.transaction((m) =>
+      this.record(m, dto, performedById, scope),
+    );
     await this.notifyIfLow(txn);
     return txn;
   }
@@ -97,6 +144,7 @@ export class InventoryStockService {
     manager: EntityManager,
     dto: CreateInventoryTransactionDto,
     performedById: string,
+    scope: InventoryScope,
   ): Promise<InventoryTransaction> {
     if (dto.quantity <= 0) {
       throw new BadRequestException('Quantity must be positive');
@@ -107,6 +155,9 @@ export class InventoryStockService {
 
     const store = await manager.findOne(InventoryStore, { where: { id: dto.storeId } });
     if (!store) throw new NotFoundException('Store not found');
+    // Lab staff move only lab items in lab stores; a transfer may still send them elsewhere.
+    assertItemInScope(scope, item);
+    assertStoreInScope(scope, store);
 
     // Stock is always held in base units (e.g. tablets); packs are converted here.
     const quantity =
@@ -152,9 +203,9 @@ export class InventoryStockService {
 
   async searchTransactions(
     query: QueryInventoryTransactionsDto,
+    scope: InventoryScope = FULL_INVENTORY_SCOPE,
   ): Promise<IPagination<InventoryTransaction>> {
-    const page = query.page ?? 1;
-    const limit = query.limit ?? 20;
+    const window = pageWindow(query);
     const sortOrder = query.sortOrder ?? 'DESC';
 
     const qb = this.transactionsRepository
@@ -162,6 +213,8 @@ export class InventoryStockService {
       .leftJoinAndSelect('txn.store', 'store')
       .leftJoinAndSelect('txn.item', 'item')
       .leftJoinAndSelect('txn.performedBy', 'performedBy');
+    scopeItems(qb, 'item', scope);
+    scopeStores(qb, 'store', scope);
 
     if (query.storeId) qb.andWhere('txn.storeId = :storeId', { storeId: query.storeId });
     if (query.itemId) qb.andWhere('txn.itemId = :itemId', { itemId: query.itemId });
@@ -170,22 +223,39 @@ export class InventoryStockService {
 
     const [items, total] = await qb
       .orderBy('txn.createdAt', sortOrder)
-      .skip((page - 1) * limit)
-      .take(limit)
+      // Tie-break on id so rows never repeat or vanish between pages.
+      .addOrderBy('txn.id', sortOrder)
+      .skip(window.skip)
+      .take(window.take)
       .getManyAndCount();
 
-    return { items, total };
+    return toPage(items, total, window);
   }
 
-  async listLowStock(): Promise<Array<InventoryStock & { minStockLevel: number }>> {
-    const rows = await this.stockRepository
+  // Most urgent first (lowest quantity), not newest: this list is a restock to-do.
+  async listLowStock(
+    query: PaginationQueryDTO = {},
+    scope: InventoryScope = FULL_INVENTORY_SCOPE,
+  ): Promise<IPagination<InventoryStock & { minStockLevel: number }>> {
+    const window = pageWindow(query);
+    const qb = this.stockRepository
       .createQueryBuilder('stock')
       .innerJoinAndSelect('stock.item', 'item')
       .innerJoinAndSelect('stock.store', 'store')
-      .where('stock.quantity <= item.minStockLevel')
+      .where('stock.quantity <= item.minStockLevel');
+    scopeItems(qb, 'item', scope);
+    scopeStores(qb, 'store', scope);
+    const [rows, total] = await qb
       .orderBy('stock.quantity', 'ASC')
-      .getMany();
-    return rows.map((r) => Object.assign(r, { minStockLevel: r.item.minStockLevel }));
+      .addOrderBy('item.name', 'ASC')
+      .addOrderBy('stock.id', 'ASC')
+      .skip(window.skip)
+      .take(window.take)
+      .getManyAndCount();
+    const items = rows.map((r) =>
+      Object.assign(r, { minStockLevel: r.item.minStockLevel }),
+    );
+    return toPage(items, total, window);
   }
 
   private async applyStockChange(

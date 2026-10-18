@@ -35,7 +35,10 @@ export class PatientSubscriber implements EntitySubscriberInterface<Patient> {
     for (let attempt = 0; attempt < 12; attempt += 1) {
       const suffix = String(Math.floor(1000 + Math.random() * 9000));
       const mrn = `PAT-${stamp}-${suffix}`;
-      const exists = await event.manager.exists(Patient, { where: { mrn } });
+      const exists = await event.manager.exists(Patient, {
+        where: { mrn },
+        withDeleted: true,
+      });
       if (!exists) {
         return mrn;
       }

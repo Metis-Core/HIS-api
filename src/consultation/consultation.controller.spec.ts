@@ -1,20 +1,21 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ConsultationController } from './consultation.controller';
-import { ConsultationService } from './consultation.service';
 
 describe('ConsultationController', () => {
   let controller: ConsultationController;
 
   beforeEach(async () => {
+    jest.clearAllMocks();
     const module: TestingModule = await Test.createTestingModule({
       controllers: [ConsultationController],
-      providers: [ConsultationService],
-    }).compile();
-
-    controller = module.get<ConsultationController>(ConsultationController);
+    })
+      .useMocker(() => ({}))
+      .compile();
+    controller = module.get(ConsultationController);
   });
 
   it('should be defined', () => {
+    // Arrange / Act / Assert
     expect(controller).toBeDefined();
   });
 });

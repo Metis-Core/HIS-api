@@ -27,6 +27,10 @@ import { InventoryItemsService } from './inventory-items.service';
 import { InventoryStockService } from './inventory-stock.service';
 import { InventoryStoresService } from './inventory-stores.service';
 import { InventoryTransactionType } from './enums/inventoryTransactionType.enum';
+import { CatalogueFilterDTO } from 'common/dto/catalogue-filter.dto';
+import { PaginationQueryDTO } from 'common/pagination';
+import { QueryInventoryStockDTO } from './dto/query-inventory-stock.dto';
+import { inventoryScopeFor } from './inventory-scope.policy';
 
 @Controller('inventory')
 export class InventoryController {
@@ -62,13 +66,19 @@ export class InventoryController {
   }
 
   @Get('items')
-  findAllItems(@Query() query: QueryInventoryItemsDto) {
-    return this.itemsService.search(query);
+  findAllItems(
+    @Query() query: QueryInventoryItemsDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.itemsService.search(query, inventoryScopeFor(user.role));
   }
 
   @Get('items/:id')
-  findOneItem(@Param('id', ParseUUIDPipe) id: string) {
-    return this.itemsService.findOne(id);
+  findOneItem(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.itemsService.findVisible(id, inventoryScopeFor(user.role));
   }
 
   @Patch('items/:id')
@@ -94,18 +104,24 @@ export class InventoryController {
   }
 
   @Get('stores')
-  findAllStores() {
-    return this.storesService.findAll();
+  findAllStores(
+    @Query() query: CatalogueFilterDTO,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.storesService.search(query, inventoryScopeFor(user.role));
   }
 
   @Get('stores/active')
-  findActiveStores() {
-    return this.storesService.listActive();
+  findActiveStores(@CurrentUser() user: AuthenticatedUser) {
+    return this.storesService.listActive(inventoryScopeFor(user.role));
   }
 
   @Get('stores/:id')
-  findOneStore(@Param('id', ParseUUIDPipe) id: string) {
-    return this.storesService.findOne(id);
+  findOneStore(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.storesService.findVisible(id, inventoryScopeFor(user.role));
   }
 
   @Patch('stores/:id')
@@ -124,21 +140,35 @@ export class InventoryController {
   }
 
   @Get('stock')
-  listStock(@Query('storeId') storeId?: string) {
-    return this.stockService.getStockLevels(storeId);
+  listStock(
+    @Query() query: QueryInventoryStockDTO,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.stockService.getStockLevels(
+      query,
+      inventoryScopeFor(user.role),
+    );
   }
 
   @Get('stock/low')
-  listLowStock() {
-    return this.stockService.listLowStock();
+  listLowStock(
+    @Query() query: PaginationQueryDTO,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.stockService.listLowStock(query, inventoryScopeFor(user.role));
   }
 
   @Get('stock/:storeId/:itemId')
   getStock(
     @Param('storeId', ParseUUIDPipe) storeId: string,
     @Param('itemId', ParseUUIDPipe) itemId: string,
+    @CurrentUser() user: AuthenticatedUser,
   ) {
-    return this.stockService.getStockFor(storeId, itemId);
+    return this.stockService.getStockFor(
+      storeId,
+      itemId,
+      inventoryScopeFor(user.role),
+    );
   }
 
   @Post('transactions')
@@ -154,11 +184,22 @@ export class InventoryController {
     @Body() dto: CreateInventoryTransactionDto,
     @CurrentUser() user: AuthenticatedUser,
   ) {
-    return this.stockService.recordTransaction(dto, user.id);
+    return this.stockService.recordTransaction(
+      dto,
+      user.id,
+      undefined,
+      inventoryScopeFor(user.role),
+    );
   }
 
   @Get('transactions')
-  searchTransactions(@Query() query: QueryInventoryTransactionsDto) {
-    return this.stockService.searchTransactions(query);
+  searchTransactions(
+    @Query() query: QueryInventoryTransactionsDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.stockService.searchTransactions(
+      query,
+      inventoryScopeFor(user.role),
+    );
   }
 }

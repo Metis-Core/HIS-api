@@ -6,6 +6,7 @@ export enum NotificationType {
   APPOINTMENT = 'appointment',
   VISIT = 'visit',
   QUEUE = 'queue',
+  MESSAGE = 'message',
   INVENTORY = 'inventory',
   GENERAL = 'general',
 }

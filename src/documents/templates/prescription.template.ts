@@ -10,7 +10,9 @@ import {
 export function renderPrescription(prescription: Prescription): string {
   const patient = prescription.patient;
   const patientName = patient
-    ? [patient.firstName, patient.middleName, patient.lastName].filter(Boolean).join(' ')
+    ? [patient.firstName, patient.middleName, patient.lastName]
+        .filter(Boolean)
+        .join(' ')
     : 'Patient';
   const prescriber = prescription.prescribedBy?.username ?? '—';
 
@@ -42,7 +44,7 @@ export function renderPrescription(prescription: Prescription): string {
       <mj-body background-color="#FFFFFF">
         ${documentHeader('Prescription')}
 
-        <mj-section padding="18px 24px">
+        <mj-section padding="18px 32px">
           <mj-column>
             <mj-table>
               <tr class="row">
@@ -67,9 +69,9 @@ export function renderPrescription(prescription: Prescription): string {
           </mj-column>
         </mj-section>
 
-        <mj-section padding="0 24px">
+        <mj-section padding="0 32px">
           <mj-column>
-            <mj-text font-size="12px" font-weight="700" color="#0E6B5C">Rx items</mj-text>
+            <mj-text font-size="12px" font-weight="700" color="#111827">Rx items</mj-text>
             <mj-table>
               <tr>
                 <th>SKU</th>
@@ -86,7 +88,7 @@ export function renderPrescription(prescription: Prescription): string {
 
         ${
           prescription.notes
-            ? `<mj-section padding="12px 24px">
+            ? `<mj-section padding="12px 32px">
                 <mj-column>
                   <mj-text class="label">Notes</mj-text>
                   <mj-text>${escape(prescription.notes)}</mj-text>
@@ -95,7 +97,7 @@ export function renderPrescription(prescription: Prescription): string {
             : ''
         }
 
-        <mj-section padding="24px 24px 0 24px">
+        <mj-section padding="32px 24px 0 24px">
           <mj-column>
             <mj-text font-size="10px" color="#5B6572">
               Provider signature: ______________________________

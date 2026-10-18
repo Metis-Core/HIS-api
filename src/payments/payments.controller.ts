@@ -28,13 +28,19 @@ export class PaymentsController {
 
   @Post()
   @Roles(RoleGroups.PROVIDERS)
-  create(@Body() dto: CreateVisitChargeDto, @CurrentUser() user: AuthenticatedUser) {
+  create(
+    @Body() dto: CreateVisitChargeDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
     return this.paymentsService.addCharge(dto, user.id);
   }
 
   @Patch(':id/status')
   @Roles(RoleGroups.BILLING)
-  setStatus(@Param('id', ParseUUIDPipe) id: string, @Body() dto: UpdateChargeStatusDto) {
+  setStatus(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: UpdateChargeStatusDto,
+  ) {
     return this.paymentsService.setStatus(id, dto.status);
   }
 

@@ -7,6 +7,9 @@ import { CreateLabTestDto } from './dto/create-lab-test.dto';
 import { QueryLabTestsDto } from './dto/query-lab-tests.dto';
 import { UpdateLabTestDto } from './dto/update-lab-test.dto';
 import { LabTest } from './entities/lab-test.entity';
+import { pageWindow, toPage } from 'common/pagination';
+import { assertValidSchema } from './results/validate-schema';
+import { containsPattern } from 'common/utils/like-pattern';
 
 @Injectable()
 export class LabTestsService extends BaseCrudService<LabTest> {
@@ -18,6 +21,7 @@ export class LabTestsService extends BaseCrudService<LabTest> {
   }
 
   override async create(dto: CreateLabTestDto): Promise<LabTest> {
+    assertValidSchema(dto.resultSchema);
     const code = dto.code.trim().toUpperCase();
     const existing = await this.labTestsRepository.findOne({ where: { code } });
     if (existing) {
@@ -27,32 +31,44 @@ export class LabTestsService extends BaseCrudService<LabTest> {
   }
 
   async search(query: QueryLabTestsDto): Promise<IPagination<LabTest>> {
-    const page = query.page ?? 1;
-    const limit = query.limit ?? 20;
+    const window = pageWindow(query);
     const sortOrder = query.sortOrder ?? 'ASC';
 
     const qb = this.labTestsRepository.createQueryBuilder('test');
-    if (query.category) qb.andWhere('test.category = :category', { category: query.category });
-    if (query.sampleType) qb.andWhere('test.sampleType = :sampleType', { sampleType: query.sampleType });
-    if (query.isActive !== undefined) qb.andWhere('test.isActive = :isActive', { isActive: query.isActive });
+    if (query.category)
+      qb.andWhere('test.category = :category', { category: query.category });
+    if (query.sampleType)
+      qb.andWhere('test.sampleType = :sampleType', {
+        sampleType: query.sampleType,
+      });
+    if (query.isActive !== undefined)
+      qb.andWhere('test.isActive = :isActive', { isActive: query.isActive });
     if (query.search?.trim()) {
-      const term = `%${query.search.trim().toLowerCase()}%`;
-      qb.andWhere('(LOWER(test.name) LIKE :term OR LOWER(test.code) LIKE :term)', { term });
+      const term = containsPattern(query.search.trim());
+      qb.andWhere(
+        '(test.name ILIKE :term OR test.code ILIKE :term OR test.abbreviation ILIKE :term)',
+        { term },
+      );
     }
 
     const [items, total] = await qb
       .orderBy('test.name', sortOrder)
-      .skip((page - 1) * limit)
-      .take(limit)
+      // Tie-break on id so rows never repeat or vanish between pages.
+      .addOrderBy('test.id', sortOrder)
+      .skip(window.skip)
+      .take(window.take)
       .getManyAndCount();
 
-    return { items, total };
+    return toPage(items, total, window);
   }
 
   override async update(id: string, dto: UpdateLabTestDto): Promise<LabTest> {
+    assertValidSchema(dto.resultSchema);
     if (dto.code) {
       const code = dto.code.trim().toUpperCase();
-      const existing = await this.labTestsRepository.findOne({ where: { code } });
+      const existing = await this.labTestsRepository.findOne({
+        where: { code },
+      });
       if (existing && existing.id !== id) {
         throw new ConflictException('A lab test with this code already exists');
       }

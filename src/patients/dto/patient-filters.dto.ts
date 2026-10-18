@@ -13,7 +13,6 @@ import { PatientType } from 'src/patients/enums/patient-type.enum';
 import { BaseFilterDTO } from '../../../common/dto/filter.dto';
 
 export class PatientFiltersDto extends BaseFilterDTO {
-
   @IsOptional()
   @IsString()
   @MaxLength(100)
@@ -51,4 +50,12 @@ export class PatientFiltersDto extends BaseFilterDTO {
   @IsOptional()
   @IsDateString()
   dateOfBirthTo?: string;
+
+  @IsOptional()
+  @IsDateString({}, { message: 'registeredFrom must be an ISO 8601 date' })
+  registeredFrom?: string;
+
+  @IsOptional()
+  @IsDateString({}, { message: 'registeredTo must be an ISO 8601 date' })
+  registeredTo?: string;
 }

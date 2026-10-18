@@ -1,31 +1,26 @@
 import {
   Body,
-  ClassSerializerInterceptor,
   Controller,
   Delete,
   Get,
+  NotFoundException,
   Param,
   ParseUUIDPipe,
   Patch,
   Post,
   Query,
-  UseGuards,
-  UseInterceptors,
 } from '@nestjs/common';
 import { RoleGroups } from 'common/access/role-groups';
 import { Roles } from 'common/decorators/roles.decorator';
 import { IPagination } from 'common/response-format';
-import { JwtAuthGuard } from 'core/guards/jwt-auth.guard';
-import { RolesGuard } from 'core/guards/roles.guard';
 import { ServicesService } from './services.service';
 import { CreateServiceDTO } from './dto/create-service.dto';
 import { ServiceResponseDTO } from './dto/service-response.dto';
 import { QueryServicesDTO } from './dto/query-services.dto';
 import { UpdateServiceDTO } from './dto/update-service.dto';
 
+// Guards are global (APP_GUARD); routes without @Roles allow any signed-in user.
 @Controller('services')
-// @UseGuards(JwtAuthGuard, RolesGuard)
-// @UseInterceptors(ClassSerializerInterceptor)
 export class ServicesController {
   constructor(private readonly servicesService: ServicesService) {}
 
@@ -43,8 +38,20 @@ export class ServicesController {
   async findAll(
     @Query() query: QueryServicesDTO,
   ): Promise<IPagination<ServiceResponseDTO>> {
-    const { items, total } = await this.servicesService.findAllPaginated(query);
-    return { items: ServiceResponseDTO.fromEntities(items), total };
+    const page = await this.servicesService.findAllPaginated(query);
+    return { ...page, items: ServiceResponseDTO.fromEntities(page.items) };
+  }
+
+  @Get('consultation-fee')
+  @Roles(RoleGroups.FLOOR_STAFF)
+  async consultationFee(): Promise<ServiceResponseDTO> {
+    const service = await this.servicesService.findConsultationService();
+    if (!service) {
+      throw new NotFoundException(
+        'No active consultation service is configured',
+      );
+    }
+    return ServiceResponseDTO.fromEntity(service);
   }
 
   @Get(':id')

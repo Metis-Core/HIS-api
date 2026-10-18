@@ -1,12 +1,20 @@
-import { applyDecorators } from '@nestjs/common';
-import { IsString, Matches, MinLength } from 'class-validator';
+import { registerDecorator, ValidationOptions } from 'class-validator';
+import { passwordProblems } from 'common/security/password-policy';
 
-export const PASSWORD_MIN_LENGTH = 8;
-
-export const IsPassword = () =>
-  applyDecorators(
-    IsString(),
-    MinLength(PASSWORD_MIN_LENGTH),
-    Matches(/[A-Za-z]/, { message: 'password must contain at least one letter' }),
-    Matches(/\d/, { message: 'password must contain at least one number' }),
-  );
+export function IsPassword(options?: ValidationOptions): PropertyDecorator {
+  return (target, propertyKey) =>
+    registerDecorator({
+      name: 'isPassword',
+      target: target.constructor,
+      propertyName: propertyKey as string,
+      options,
+      validator: {
+        validate: (value: unknown) =>
+          typeof value === 'string' && passwordProblems(value).length === 0,
+        defaultMessage: (args) =>
+          typeof args?.value === 'string'
+            ? `password must ${passwordProblems(args.value).join(', ')}`
+            : 'password must be a string',
+      },
+    });
+}

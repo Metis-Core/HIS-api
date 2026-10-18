@@ -20,17 +20,21 @@ import { CreateLabOrderDto } from './dto/create-lab-order.dto';
 import { CreateLabTestDto } from './dto/create-lab-test.dto';
 import { QueryLabOrdersDto } from './dto/query-lab-orders.dto';
 import { QueryLabTestsDto } from './dto/query-lab-tests.dto';
-import { UpdateLabOrderItemDto } from './dto/update-lab-order-item.dto';
 import { UpdateLabOrderDto } from './dto/update-lab-order.dto';
 import { UpdateLabTestDto } from './dto/update-lab-test.dto';
+import { LabOrderIntakeService } from './lab-order-intake.service';
 import { LabOrdersService } from './lab-orders.service';
+import { CancelLabOrderDto } from './dto/cancel-lab-order.dto';
 import { LabTestsService } from './lab-tests.service';
+import { PaginationQueryDTO } from 'common/pagination';
+import { releaseFor } from './results/release';
 
 @Controller('lab')
 export class LabController {
   constructor(
     private readonly labTestsService: LabTestsService,
     private readonly labOrdersService: LabOrdersService,
+    private readonly labOrderIntake: LabOrderIntakeService,
   ) {}
 
   @Post('tests')
@@ -66,43 +70,78 @@ export class LabController {
   }
 
   @Post('orders')
-  @Roles(RoleGroups.PROVIDERS)
+  @Roles(RoleGroups.LAB_ORDERERS)
   @HttpCode(HttpStatus.CREATED)
   createOrder(
     @Body() dto: CreateLabOrderDto,
     @CurrentUser() user: AuthenticatedUser,
   ) {
-    return this.labOrdersService.createOrder(dto, user.id);
+    return this.labOrderIntake.createOrder(dto, user.id);
   }
 
   @Get('orders')
-  @Roles(UserRole.DOCTOR, UserRole.NURSE, UserRole.LAB_TECH, UserRole.ADMIN, UserRole.SUPER_ADMIN)
-  findAllOrders(@Query() query: QueryLabOrdersDto) {
-    return this.labOrdersService.search(query);
+  @Roles(
+    UserRole.DOCTOR,
+    UserRole.NURSE,
+    UserRole.LAB_TECH,
+    UserRole.ADMIN,
+    UserRole.SUPER_ADMIN,
+  )
+  async findAllOrders(
+    @Query() query: QueryLabOrdersDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    const page = await this.labOrdersService.search(query);
+    releaseFor(user.role, page.items);
+    return page;
   }
 
   @Get('orders/patient/:patientId')
   @Roles(RoleGroups.CLINICAL_STAFF)
-  findOrdersByPatient(@Param('patientId', ParseUUIDPipe) patientId: string) {
-    return this.labOrdersService.findByPatient(patientId);
+  async findOrdersByPatient(
+    @Param('patientId', ParseUUIDPipe) patientId: string,
+    @Query() query: PaginationQueryDTO,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    const page = await this.labOrdersService.findByPatient(patientId, query);
+    releaseFor(user.role, page.items);
+    return page;
   }
 
   @Get('orders/consultation/:consultationId')
   @Roles(RoleGroups.CLINICAL_STAFF)
-  findOrdersByConsultation(
+  async findOrdersByConsultation(
     @Param('consultationId', ParseUUIDPipe) consultationId: string,
+    @CurrentUser() user: AuthenticatedUser,
   ) {
-    return this.labOrdersService.findByConsultation(consultationId);
+    return releaseFor(
+      user.role,
+      await this.labOrdersService.findByConsultation(consultationId),
+    );
   }
 
   @Get('orders/:id')
-  @Roles(UserRole.DOCTOR, UserRole.NURSE, UserRole.LAB_TECH, UserRole.ADMIN, UserRole.SUPER_ADMIN)
-  findOneOrder(@Param('id', ParseUUIDPipe) id: string) {
-    return this.labOrdersService.findOne(id);
+  @Roles(
+    UserRole.DOCTOR,
+    UserRole.NURSE,
+    UserRole.LAB_TECH,
+    UserRole.ADMIN,
+    UserRole.SUPER_ADMIN,
+  )
+  async findOneOrder(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return releaseFor(user.role, await this.labOrdersService.findOne(id));
   }
 
   @Patch('orders/:id')
-  @Roles(UserRole.DOCTOR, UserRole.LAB_TECH, UserRole.ADMIN, UserRole.SUPER_ADMIN)
+  @Roles(
+    UserRole.DOCTOR,
+    UserRole.LAB_TECH,
+    UserRole.ADMIN,
+    UserRole.SUPER_ADMIN,
+  )
   updateOrder(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: UpdateLabOrderDto,
@@ -114,19 +153,9 @@ export class LabController {
   @Roles(UserRole.DOCTOR, UserRole.ADMIN, UserRole.SUPER_ADMIN)
   cancelOrder(
     @Param('id', ParseUUIDPipe) id: string,
-    @Body('reason') reason?: string,
-  ) {
-    return this.labOrdersService.cancelOrder(id, reason);
-  }
-
-  @Patch('orders/:orderId/items/:itemId')
-  @Roles(UserRole.LAB_TECH, UserRole.ADMIN, UserRole.SUPER_ADMIN)
-  updateOrderItem(
-    @Param('orderId', ParseUUIDPipe) orderId: string,
-    @Param('itemId', ParseUUIDPipe) itemId: string,
-    @Body() dto: UpdateLabOrderItemDto,
+    @Body() dto: CancelLabOrderDto,
     @CurrentUser() user: AuthenticatedUser,
   ) {
-    return this.labOrdersService.updateItem(orderId, itemId, dto, user.id);
+    return this.labOrdersService.cancelOrder(id, dto.reason, user.id);
   }
 }

@@ -10,7 +10,7 @@ export class VisitCharge extends BaseEntity {
   @Column({ type: 'uuid' })
   visitId: string;
 
-  @ManyToOne(() => Visit, { onDelete: 'CASCADE' })
+  @ManyToOne(() => Visit, { onDelete: 'RESTRICT' })
   @JoinColumn({ name: 'visitId' })
   visit: Visit;
 

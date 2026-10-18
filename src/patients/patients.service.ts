@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ConflictException,
   Injectable,
   NotFoundException,
@@ -7,6 +8,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import {
   Between,
+  Brackets,
   FindOptionsWhere,
   ILike,
   LessThanOrEqual,
@@ -17,6 +19,7 @@ import { CreatePatientDto } from './dto/create-patient.dto';
 import { PatientFiltersDto } from './dto/patient-filters.dto';
 import { UpdatePatientDto } from './dto/update-patient.dto';
 import { Patient } from './entities/patient.entity';
+import { PatientScope, scopeCondition } from './patient-scope.policy';
 import {
   PatientCreatedEvent,
   PatientDeletedEvent,
@@ -28,6 +31,18 @@ import {
 import { ContactsService } from '../contacts/contacts.service';
 import { BaseCrudService } from '../../common/services/crud.service';
 import { IPagination } from '../../common/response-format';
+import { pageWindow, toPage } from '../../common/pagination';
+import { containsPattern } from '../../common/utils/like-pattern';
+
+const SEARCHABLE_FIELDS = [
+  'firstName',
+  'middleName',
+  'lastName',
+  'mrn',
+  'phone',
+  'email',
+  'nationalId',
+] as const;
 
 @Injectable()
 export class PatientsService extends BaseCrudService<Patient> {
@@ -37,7 +52,7 @@ export class PatientsService extends BaseCrudService<Patient> {
     private readonly contactService: ContactsService,
     private readonly events: EventEmitter2,
   ) {
-    super(patientsRepository)
+    super(patientsRepository);
   }
 
   private emit(event: PatientEvent): void {
@@ -49,6 +64,7 @@ export class PatientsService extends BaseCrudService<Patient> {
 
     if (rest.phone || rest.email || rest.nationalId) {
       const duplicate = await this.patientsRepository.findOne({
+        withDeleted: true,
         where: [
           ...(rest.phone ? [{ phone: rest.phone }] : []),
           ...(rest.email ? [{ email: rest.email }] : []),
@@ -67,19 +83,20 @@ export class PatientsService extends BaseCrudService<Patient> {
     );
 
     if (emergencyContact) {
-      await this.contactService.create({ patientId: patient.id, ...emergencyContact });
+      await this.contactService.create({
+        patientId: patient.id,
+        ...emergencyContact,
+      });
     }
 
     this.emit(new PatientCreatedEvent(toPatientEventData(patient)));
     return patient;
   }
 
-  override async update(
-    id: string,
-    dto: UpdatePatientDto,
-  ): Promise<Patient> {
+  override async update(id: string, dto: UpdatePatientDto): Promise<Patient> {
     const existing = await this.findOne(id);
     const { emergencyContact, ...rest } = dto;
+    if (!emergencyContact) await this.assertHasNextOfKin(id);
     await super.update(id, rest);
     if (emergencyContact) {
       await this.contactService.upsertForPatient(id, emergencyContact);
@@ -99,41 +116,76 @@ export class PatientsService extends BaseCrudService<Patient> {
     return updated;
   }
 
+  // Legacy rows may lack a next of kin; any edit must add one (R2).
+  private async assertHasNextOfKin(id: string): Promise<void> {
+    const patient = await this.patientsRepository.findOne({
+      where: { id },
+      relations: { contact: true },
+    });
+    if (!patient?.contact) {
+      throw new BadRequestException(
+        'emergencyContact (next of kin) is required for this patient',
+      );
+    }
+  }
+
+  // Clinical records are kept; deleting a patient only archives the row.
   override async remove(id: string): Promise<void> {
     const patient = await this.findOne(id);
-    await super.remove(id);
+    await this.patientsRepository.softRemove(
+      await this.patientsRepository.findOneByOrFail({ id }),
+    );
     this.emit(new PatientDeletedEvent(toPatientEventData(patient)));
   }
 
-  async search(query: PatientFiltersDto): Promise<IPagination<Patient>> {
-    const { page = 1, limit = 20, sortOrder = 'DESC', search, ...filters } = query;
-    const base = this.buildWhere(filters);
-    const term = search?.trim();
-
-    return this.findManyWithPagination({
-      where: term ? this.withSearch(base, term) : base,
-      order: { createdAt: sortOrder },
-      skip: (page - 1) * limit,
-      take: limit,
-      relations: { contact: true },
-    });
+  /** Opens a patient only if it is inside the caller's scope; otherwise 404, so ids cannot be probed. */
+  async findOneInScope(id: string, scope: PatientScope): Promise<Patient> {
+    const qb = this.patientsRepository
+      .createQueryBuilder('patient')
+      .leftJoinAndSelect('patient.contact', 'contact')
+      .where('patient.id = :id', { id });
+    const condition = scopeCondition(scope);
+    if (condition) qb.andWhere(condition);
+    const patient = await qb.getOne();
+    if (!patient) throw new NotFoundException('Patient not found');
+    return patient;
   }
 
-  private withSearch(
-    base: FindOptionsWhere<Patient>,
-    term: string,
-  ): FindOptionsWhere<Patient>[] {
-    const like = ILike(`%${term}%`);
-    const fields: (keyof Patient)[] = [
-      'firstName',
-      'middleName',
-      'lastName',
-      'mrn',
-      'phone',
-      'email',
-      'nationalId',
-    ];
-    return fields.map((field) => ({ ...base, [field]: like }));
+  async search(
+    query: PatientFiltersDto,
+    scope: PatientScope = PatientScope.ALL,
+  ): Promise<IPagination<Patient>> {
+    const { page, limit, sortOrder = 'DESC', search, ...filters } = query;
+    const window = pageWindow({ page, limit });
+    const qb = this.patientsRepository
+      .createQueryBuilder('patient')
+      .leftJoinAndSelect('patient.contact', 'contact')
+      .where(this.buildWhere(filters))
+      .orderBy('patient.createdAt', sortOrder)
+      .addOrderBy('patient.id', sortOrder)
+      .skip(window.skip)
+      .take(window.take);
+
+    const condition = scopeCondition(scope);
+    if (condition) qb.andWhere(condition);
+
+    // Every word must match some identifying field, so "jane nakato" finds Jane Nakato.
+    const words = search?.trim().split(/\s+/).filter(Boolean) ?? [];
+    words.forEach((word, index) => {
+      const param = `term${index}`;
+      qb.andWhere(
+        new Brackets((sub) => {
+          SEARCHABLE_FIELDS.forEach((field) =>
+            sub.orWhere(`patient.${field} ILIKE :${param}`, {
+              [param]: containsPattern(word),
+            }),
+          );
+        }),
+      );
+    });
+
+    const [items, total] = await qb.getManyAndCount();
+    return toPage(items, total, window);
   }
 
   private buildWhere(
@@ -146,16 +198,37 @@ export class PatientsService extends BaseCrudService<Patient> {
     if (filters.gender) base.gender = filters.gender;
     if (filters.bloodType) base.bloodType = filters.bloodType;
     if (filters.maritalStatus) base.maritalStatus = filters.maritalStatus;
-    if (filters.city?.trim()) base.city = ILike(`%${filters.city.trim()}%`);
+    if (filters.city?.trim())
+      base.city = ILike(containsPattern(filters.city.trim()));
 
     if (filters.dateOfBirthFrom && filters.dateOfBirthTo) {
-      base.dateOfBirth = Between(filters.dateOfBirthFrom, filters.dateOfBirthTo);
+      base.dateOfBirth = Between(
+        filters.dateOfBirthFrom,
+        filters.dateOfBirthTo,
+      );
     } else if (filters.dateOfBirthFrom) {
       base.dateOfBirth = MoreThanOrEqual(filters.dateOfBirthFrom);
     } else if (filters.dateOfBirthTo) {
       base.dateOfBirth = LessThanOrEqual(filters.dateOfBirthTo);
     }
 
+    const createdAt = this.dateRange(
+      filters.registeredFrom,
+      filters.registeredTo,
+    );
+    if (createdAt) base.createdAt = createdAt;
+
     return base;
+  }
+
+  private dateRange(from?: string, to?: string) {
+    const start = from
+      ? new Date(`${from.slice(0, 10)}T00:00:00.000Z`)
+      : undefined;
+    const end = to ? new Date(`${to.slice(0, 10)}T23:59:59.999Z`) : undefined;
+    if (start && end) return Between(start, end);
+    if (start) return MoreThanOrEqual(start);
+    if (end) return LessThanOrEqual(end);
+    return undefined;
   }
 }
