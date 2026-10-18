@@ -1,4 +1,10 @@
-import { IsArray, IsEnum, IsOptional, IsString, MaxLength } from 'class-validator';
+import {
+  IsArray,
+  IsEnum,
+  IsOptional,
+  IsString,
+  MaxLength,
+} from 'class-validator';
 import { Department } from 'common/enums/department.enum';
 import { VisitIntenentsEnum } from 'src/queue/enums/visit-type.enum';
 
