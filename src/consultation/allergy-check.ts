@@ -44,11 +44,7 @@ export function allergyEntries(allergies: string | null | undefined): string[] {
     .filter((entry) => words(entry).length > 0);
 }
 
-/**
- * Name-based screen only: flags a medication whose name or generic name contains a word
- * from a recorded allergy (e.g. "penicillin" matches "Benzylpenicillin"). It does not
- * know drug classes, so "penicillin" will not flag amoxicillin.
- */
+// Name-based only: "penicillin" flags Benzylpenicillin but not amoxicillin (no drug classes yet).
 export function findAllergyMatches(
   allergies: string | null | undefined,
   medications: readonly PrescribedMedication[],
