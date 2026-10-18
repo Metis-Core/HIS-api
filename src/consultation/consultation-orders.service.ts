@@ -1,8 +1,12 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, UnprocessableEntityException } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { In, Repository } from 'typeorm';
+import { InventoryItem } from 'src/inventory/entities/inventory-item.entity';
 import { LabOrder } from 'src/lab/entities/lab-order.entity';
 import { LabOrdersService } from 'src/lab/lab-orders.service';
 import { Prescription } from 'src/pharmacy/entities/prescription.entity';
 import { PharmacyService } from 'src/pharmacy/pharmacy.service';
+import { AllergyMatch, findAllergyMatches } from './allergy-check';
 import { ConsultationActor } from './consultation-access.policy';
 import { assertOpenForEditing } from './consultation-lock.policy';
 import { ConsultationService } from './consultation.service';
@@ -19,6 +23,8 @@ export class ConsultationOrdersService {
     private readonly consultations: ConsultationService,
     private readonly labOrders: LabOrdersService,
     private readonly pharmacy: PharmacyService,
+    @InjectRepository(InventoryItem)
+    private readonly items: Repository<InventoryItem>,
   ) {}
 
   async orderLabs(
@@ -40,10 +46,37 @@ export class ConsultationOrdersService {
     actor: ConsultationActor,
   ): Promise<Prescription> {
     const consultation = await this.openFor(id, actor);
+    const { allergyAcknowledged, ...prescription } = dto;
+    const matches = await this.allergyMatches(consultation, dto);
+    if (matches.length && !allergyAcknowledged) {
+      throw new UnprocessableEntityException(
+        `Allergy warning: ${describeMatches(matches)}. Confirm to prescribe anyway.`,
+      );
+    }
+    const notes = matches.length
+      ? [
+          `Allergy warning acknowledged: ${describeMatches(matches)}.`,
+          dto.notes,
+        ]
+          .filter(Boolean)
+          .join('\n')
+      : dto.notes;
     return this.pharmacy.createPrescription(
-      { ...dto, ...this.links(consultation) },
+      { ...prescription, notes, ...this.links(consultation) },
       actor.id,
     );
+  }
+
+  private async allergyMatches(
+    consultation: Consultation,
+    dto: CreateConsultationPrescriptionDTO,
+  ): Promise<AllergyMatch[]> {
+    const allergies = consultation.patient?.allergies;
+    if (!allergies?.trim()) return [];
+    const medications = await this.items.findBy({
+      id: In(dto.items.map((item) => item.itemId)),
+    });
+    return findAllergyMatches(allergies, medications);
   }
 
   private async openFor(
@@ -63,3 +96,6 @@ export class ConsultationOrdersService {
     };
   }
 }
+
+const describeMatches = (matches: AllergyMatch[]) =>
+  matches.map((m) => `${m.medication} (allergy: ${m.allergy})`).join(', ');

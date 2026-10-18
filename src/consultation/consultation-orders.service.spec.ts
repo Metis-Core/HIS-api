@@ -1,6 +1,8 @@
 import { ConflictException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
+import { getRepositoryToken } from '@nestjs/typeorm';
 import { UserRole } from 'common/enums/userRoles.enum';
+import { InventoryItem } from 'src/inventory/entities/inventory-item.entity';
 import { LabOrdersService } from 'src/lab/lab-orders.service';
 import { PharmacyService } from 'src/pharmacy/pharmacy.service';
 import { ConsultationOrdersService } from './consultation-orders.service';
@@ -31,6 +33,7 @@ describe('ConsultationOrdersService', () => {
         { provide: ConsultationService, useValue: consultations },
         { provide: LabOrdersService, useValue: labOrders },
         { provide: PharmacyService, useValue: pharmacy },
+        { provide: getRepositoryToken(InventoryItem), useValue: {} },
       ],
     }).compile();
     service = module.get(ConsultationOrdersService);
