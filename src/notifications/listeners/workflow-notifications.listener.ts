@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import { Department } from 'common/enums/department.enum';
 import { UserRole } from 'common/enums/userRoles.enum';
 import { LabOrderCancelledEvent } from 'src/lab/events/lab-order-cancelled.event';
@@ -15,7 +15,9 @@ import { Prescription } from 'src/pharmacy/entities/prescription.entity';
 import { PrescriptionStatus } from 'src/pharmacy/enums/prescription-status.enum';
 import { PrescriptionCreatedEvent } from 'src/pharmacy/events/prescription-created.event';
 import { PrescriptionDispensedEvent } from 'src/pharmacy/events/prescription-dispensed.event';
+import { DoctorAssignedEvent } from 'src/doctors/events/doctor-assigned.event';
 import { QueueEntry } from 'src/queue/entities/queue-entry.entity';
+import { QueueEntryStatus } from 'src/queue/enums/queue-entry-status.enum';
 import { Visit } from 'src/queue/entities/visit.entity';
 import {
   QueueEntryCalledEvent,
@@ -91,7 +93,10 @@ export class WorkflowNotificationsListener {
   async onVisitCheckedIn(event: VisitCheckedInEvent) {
     await this.safely('visit check-in', async () => {
       const first = await this.queueEntriesRepository.findOne({
-        where: { visitId: event.visitId },
+        where: {
+          visitId: event.visitId,
+          status: In([QueueEntryStatus.WAITING, QueueEntryStatus.CALLED]),
+        },
         order: { sequenceNumber: 'ASC' },
       });
       if (!first) return;
@@ -144,6 +149,33 @@ export class WorkflowNotificationsListener {
         resourceType: 'visit',
         resourceId: visitId,
       });
+    });
+  }
+
+  @OnEvent(DoctorAssignedEvent.channel, { async: true })
+  async onDoctorAssigned(event: DoctorAssignedEvent) {
+    await this.safely('doctor assigned', async () => {
+      const patient = await this.patientLabelForVisit(event.visitId);
+      await this.dispatcher.toUsers([event.doctorId], {
+        type: NotificationType.QUEUE,
+        priority: NotificationPriority.HIGH,
+        title: 'Patient assigned to you',
+        body: `${patient} has been assigned to you for consultation.`,
+        actionUrl: `/queue/${event.visitId}`,
+        resourceType: 'visit',
+        resourceId: event.visitId,
+      });
+      if (event.previousDoctorId) {
+        await this.dispatcher.toUsers([event.previousDoctorId], {
+          type: NotificationType.QUEUE,
+          priority: NotificationPriority.NORMAL,
+          title: 'Patient moved to another doctor',
+          body: `${patient} is no longer on your list.`,
+          actionUrl: '/queue',
+          resourceType: 'visit',
+          resourceId: event.visitId,
+        });
+      }
     });
   }
 

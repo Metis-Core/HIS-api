@@ -1,7 +1,9 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
+import { Department } from 'common/enums/department.enum';
 import { PatientsService } from 'src/patients/patients.service';
 import { QueueEntriesService } from 'src/queue/queue-entries.service';
+import { DoctorAssignmentService } from 'src/doctors/doctor-assignment.service';
 import { UsersService } from 'src/users/users.service';
 import { VisitsService } from 'src/queue/visit.service';
 import { TriageCategory } from 'src/queue/enums/triage-category.enum';
@@ -20,6 +22,12 @@ describe('TraigeService', () => {
     createQueryBuilder: jest.fn(),
   };
   const visits = { raiseCategory: jest.fn() };
+  const assignment = { assignIfNeeded: jest.fn() };
+  const queueEntries = {
+    ensureIntent: jest.fn(),
+    completeCurrentFor: jest.fn(),
+    findOpenEntryForPatient: jest.fn(),
+  };
 
   beforeEach(async () => {
     jest.clearAllMocks();
@@ -41,11 +49,9 @@ describe('TraigeService', () => {
         },
         {
           provide: QueueEntriesService,
-          useValue: {
-            ensureIntent: jest.fn(),
-            completeCurrentFor: jest.fn(),
-          },
+          useValue: queueEntries,
         },
+        { provide: DoctorAssignmentService, useValue: assignment },
       ],
     }).compile();
 
@@ -78,5 +84,34 @@ describe('TraigeService', () => {
 
     // Assert
     expect(visits.raiseCategory).toHaveBeenCalledWith('v1', TriageCategory.RED);
+  });
+
+  it('finishes the triage stage and assigns a doctor when the nurse records triage without a visit', async () => {
+    repository.save.mockResolvedValue({ id: 't1' });
+    repository.findOne.mockResolvedValue({
+      id: 't1',
+      patientId: 'p1',
+      acuity: TriageAcuity.LEVEL_4,
+      status: TriageStatus.COMPLETED,
+    });
+    queueEntries.findOpenEntryForPatient.mockResolvedValue({ visitId: 'v9' });
+
+    await service.createTriage(
+      {
+        patientId: 'p1',
+        acuity: TriageAcuity.LEVEL_4,
+        chiefComplaint: 'Cough',
+      },
+      'nurse-1',
+    );
+
+    expect(repository.create).toHaveBeenCalledWith(
+      expect.objectContaining({ status: TriageStatus.COMPLETED }),
+    );
+    expect(queueEntries.completeCurrentFor).toHaveBeenCalledWith(
+      'v9',
+      Department.TRIAGE,
+    );
+    expect(assignment.assignIfNeeded).toHaveBeenCalledWith('v9');
   });
 });
