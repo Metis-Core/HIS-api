@@ -111,7 +111,9 @@ export class PatientsService extends BaseCrudService<Patient> {
   // Clinical records are kept; deleting a patient only archives the row.
   override async remove(id: string): Promise<void> {
     const patient = await this.findOne(id);
-    await this.patientsRepository.softDelete(id);
+    await this.patientsRepository.softRemove(
+      await this.patientsRepository.findOneByOrFail({ id }),
+    );
     this.emit(new PatientDeletedEvent(toPatientEventData(patient)));
   }
 

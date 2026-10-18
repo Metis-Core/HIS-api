@@ -68,16 +68,15 @@ export abstract class BaseCrudService<T extends BaseEntity> {
     return entity;
   }
 
+  // Entity-level save/remove (not query-builder writes) so subscribers such as the audit log see the change.
   async update(id: string, updateDto: DeepPartial<T>): Promise<T> {
-    await this.findOne(id);
-    await this.repository.update({ id } as any, updateDto as any);
+    const entity = await this.findOne(id);
+    await this.repository.save(this.repository.merge(entity, updateDto));
     return await this.findOne(id);
   }
 
   async remove(id: string): Promise<void> {
-    const result = await this.repository.delete(id);
-    if (result.affected === 0) {
-      throw new NotFoundException(`Entity with ID ${id} not found`);
-    }
+    const entity = await this.findOne(id);
+    await this.repository.remove(entity);
   }
 }

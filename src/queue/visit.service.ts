@@ -1,7 +1,4 @@
-import {
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { DeepPartial, Repository } from 'typeorm';
@@ -16,7 +13,10 @@ import { VisitIntenentsEnum } from './enums/visit-type.enum';
 import { VisitCheckedInEvent } from './events/visit-checked-in.event';
 import { BaseCrudService } from '../../common/services/crud.service';
 
-const CHECK_IN_INTENTS = [VisitIntenentsEnum.EXAMINATION, VisitIntenentsEnum.CONSULTATION]
+const CHECK_IN_INTENTS = [
+  VisitIntenentsEnum.EXAMINATION,
+  VisitIntenentsEnum.CONSULTATION,
+];
 
 @Injectable()
 export class VisitsService extends BaseCrudService<Visit> {
@@ -29,18 +29,20 @@ export class VisitsService extends BaseCrudService<Visit> {
     private readonly usersService: UsersService,
     private readonly events: EventEmitter2,
   ) {
-    super(visitsRepository)
+    super(visitsRepository);
   }
 
-  override async create(entity: CreateVisitDTO & { handler: string }): Promise<Visit> {
-    const { patientId, visitType, insuranceVerification, handler } = entity
+  override async create(
+    entity: CreateVisitDTO & { handler: string },
+  ): Promise<Visit> {
+    const { patientId, visitType, insuranceVerification, handler } = entity;
 
     if (!handler) {
-      throw new NotFoundException('Handler ID is required')
+      throw new NotFoundException('Handler ID is required');
     }
-    await this.usersService.findOne(handler)
+    await this.usersService.findOne(handler);
     if (!patientId || !(await this.patientsService.findByStringId(patientId))) {
-      throw new NotFoundException('Patient not found')
+      throw new NotFoundException('Patient not found');
     }
 
     const visit = await this.visitsRepository.save({
@@ -57,7 +59,7 @@ export class VisitsService extends BaseCrudService<Visit> {
           },
         }),
       },
-    })
+    });
 
     const entries = CHECK_IN_INTENTS.map((item, index) => ({
       visitId: visit.id,
@@ -65,25 +67,32 @@ export class VisitsService extends BaseCrudService<Visit> {
       status: QueueEntryStatus.WAITING,
       priority: 5,
       sequenceNumber: index + 1,
-    }))
-    await this.queueEntriesRepository.save(entries)
+    }));
+    await this.queueEntriesRepository.save(entries);
 
     this.events.emit(
       VisitCheckedInEvent.channel,
       new VisitCheckedInEvent(visit.id, patientId, handler),
-    )
+    );
 
-    return visit
+    return visit;
   }
 
-  override async update(id: string, entity: DeepPartial<Visit>): Promise<Visit> {
-    const existing = await this.findByStringId(id)
-    const { metadata, ...rest } = entity
-    const merged: DeepPartial<Visit> = {
-      ...rest,
-      metadata: { ...(existing.metadata ?? {}), ...(metadata ?? {}) } as any,
-    }
-    await this.visitsRepository.update({ id }, merged as any)
-    return this.findByStringId(id)
+  override async update(
+    id: string,
+    entity: DeepPartial<Visit>,
+  ): Promise<Visit> {
+    const existing = await this.findByStringId(id);
+    const { metadata, ...rest } = entity as Omit<
+      DeepPartial<Visit>,
+      'metadata'
+    > & {
+      metadata?: Record<string, unknown>;
+    };
+    const current = (existing.metadata ?? {}) as Record<string, unknown>;
+    this.visitsRepository.merge(existing, rest);
+    existing.metadata = { ...current, ...(metadata ?? {}) };
+    await this.visitsRepository.save(existing);
+    return this.findByStringId(id);
   }
 }
