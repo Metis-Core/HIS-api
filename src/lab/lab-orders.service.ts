@@ -25,6 +25,7 @@ import { LabPriority } from './enums/lab-priority.enum';
 import { LabOrderCreatedEvent } from './events/lab-order-created.event';
 import { LabOrderCancelledEvent } from './events/lab-order-cancelled.event';
 import { PaginationQueryDTO, pageWindow, toPage } from 'common/pagination';
+import { commitThenEmit } from 'common/events/after-commit';
 import { wherePatientMatches } from 'common/utils/query-list';
 
 @Injectable()
@@ -66,54 +67,52 @@ export class LabOrdersService extends BaseCrudService<LabOrder> {
       throw new BadRequestException('One or more lab tests are invalid or inactive');
     }
 
-    return this.dataSource.transaction(async (manager) => {
-      const order = manager.create(LabOrder, {
-        patientId: dto.patientId,
-        consultationId: dto.consultationId ?? null,
-        visitId: dto.visitId ?? null,
-        orderedById,
-        status: LabOrderStatus.PENDING,
-        priority: dto.priority ?? LabPriority.ROUTINE,
-        clinicalNotes: dto.clinicalNotes?.trim() ?? null,
-      });
-      const savedOrder = await manager.save(order);
+    const order = await commitThenEmit(
+      this.dataSource,
+      this.eventEmitter,
+      async (manager, after) => {
+        const saved = await manager.save(
+          manager.create(LabOrder, {
+            patientId: dto.patientId,
+            consultationId: dto.consultationId ?? null,
+            visitId: dto.visitId ?? null,
+            orderedById,
+            status: LabOrderStatus.PENDING,
+            priority: dto.priority ?? LabPriority.ROUTINE,
+            clinicalNotes: dto.clinicalNotes?.trim() ?? null,
+          }),
+        );
+        await manager.save(
+          testIds.map((testId) =>
+            manager.create(LabOrderItem, {
+              orderId: saved.id,
+              testId,
+              status: LabOrderItemStatus.PENDING,
+            }),
+          ),
+        );
+        const full = await manager.findOneOrFail(LabOrder, {
+          where: { id: saved.id },
+          relations: { items: { test: true }, patient: true, orderedBy: true },
+        });
+        after.emit(LabOrderCreatedEvent.name, createdEvent(full));
+        after.run(() => this.enqueueForLab(full.visitId));
+        return full;
+      },
+    );
+    return order;
+  }
 
-      const items = testIds.map((testId) =>
-        manager.create(LabOrderItem, {
-          orderId: savedOrder.id,
-          testId,
-          status: LabOrderItemStatus.PENDING,
-        }),
+  // Queueing is best-effort; the order stands regardless.
+  private async enqueueForLab(visitId: string | null): Promise<void> {
+    if (!visitId) return;
+    try {
+      await this.queueEntries.ensureIntent(visitId, VisitIntenentsEnum.LAB);
+    } catch (err) {
+      this.logger.warn(
+        `Failed to enqueue visit ${visitId} for lab: ${(err as Error).message}`,
       );
-      await manager.save(items);
-
-      const full = await manager.findOneOrFail(LabOrder, {
-        where: { id: savedOrder.id },
-        relations: { items: { test: true }, patient: true, orderedBy: true },
-      });
-
-      this.eventEmitter.emit(
-        LabOrderCreatedEvent.name,
-        new LabOrderCreatedEvent(
-          full.id,
-          full.patientId,
-          orderedById,
-          full.visitId,
-          full.items.map((item) => ({ itemId: item.id, testName: item.test.name, price: item.test.price })),
-        ),
-      );
-
-      if (full.visitId) {
-        try {
-          await this.queueEntries.ensureIntent(full.visitId, VisitIntenentsEnum.LAB);
-        } catch (err) {
-          // Queue enqueue is best-effort; the order stands regardless.
-          this.logger.warn(`Failed to enqueue visit ${full.visitId} for lab: ${(err as Error).message}`);
-        }
-      }
-
-      return full;
-    });
+    }
   }
 
   override async findOne(id: string): Promise<LabOrder> {
@@ -201,25 +200,44 @@ export class LabOrdersService extends BaseCrudService<LabOrder> {
     const order = await this.findOne(id);
     if (order.status === LabOrderStatus.CANCELLED) return order;
 
-    return this.dataSource.transaction(async (manager) => {
-      order.status = LabOrderStatus.CANCELLED;
-      order.completedAt = order.completedAt ?? new Date();
-      if (reason) order.clinicalNotes = reason;
-      await manager.save(order);
-
-      await manager.update(
-        LabOrderItem,
-        { orderId: id, status: In([LabOrderItemStatus.PENDING, LabOrderItemStatus.COLLECTED, LabOrderItemStatus.IN_PROCESS]) },
-        { status: LabOrderItemStatus.CANCELLED },
-      );
-
-      return this.findOne(id);
-    }).then((cancelled) => {
-      this.eventEmitter.emit(
-        LabOrderCancelledEvent.name,
-        new LabOrderCancelledEvent(cancelled.id, cancelled.patientId, cancelled.orderedById),
-      );
-      return cancelled;
-    });
+    return commitThenEmit(
+      this.dataSource,
+      this.eventEmitter,
+      async (manager, after) => {
+        order.status = LabOrderStatus.CANCELLED;
+        order.completedAt = order.completedAt ?? new Date();
+        if (reason) order.clinicalNotes = reason;
+        await manager.save(order);
+        await manager.update(
+          LabOrderItem,
+          { orderId: id, status: In(CANCELLABLE_ITEM_STATUSES) },
+          { status: LabOrderItemStatus.CANCELLED },
+        );
+        after.emit(
+          LabOrderCancelledEvent.name,
+          new LabOrderCancelledEvent(order.id, order.patientId, order.orderedById),
+        );
+        return order;
+      },
+    ).then(() => this.findOne(id));
   }
 }
+
+const CANCELLABLE_ITEM_STATUSES = [
+  LabOrderItemStatus.PENDING,
+  LabOrderItemStatus.COLLECTED,
+  LabOrderItemStatus.IN_PROCESS,
+];
+
+const createdEvent = (order: LabOrder) =>
+  new LabOrderCreatedEvent(
+    order.id,
+    order.patientId,
+    order.orderedById,
+    order.visitId,
+    order.items.map((item) => ({
+      itemId: item.id,
+      testName: item.test.name,
+      price: item.test.price,
+    })),
+  );
