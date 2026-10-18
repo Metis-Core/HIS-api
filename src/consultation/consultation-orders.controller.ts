@@ -13,6 +13,7 @@ import { RoleGroups } from 'common/access/role-groups';
 import { Roles } from 'common/decorators/roles.decorator';
 import type { AuthenticatedUser } from 'common/interfaces/authenticated-user.interface';
 import { LabOrdersService } from 'src/lab/lab-orders.service';
+import { releaseFor } from 'src/lab/results/release';
 import { PharmacyService } from 'src/pharmacy/pharmacy.service';
 import { ConsultationOrdersService } from './consultation-orders.service';
 import {
@@ -31,8 +32,14 @@ export class ConsultationOrdersController {
 
   @Get(':id/lab-orders')
   @Roles(RoleGroups.CLINICAL_STAFF)
-  listLabOrders(@Param('id', ParseUUIDPipe) id: string) {
-    return this.labOrdersService.findByConsultation(id);
+  async listLabOrders(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return releaseFor(
+      user.role,
+      await this.labOrdersService.findByConsultation(id),
+    );
   }
 
   @Post(':id/lab-orders')

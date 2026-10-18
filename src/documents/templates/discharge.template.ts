@@ -9,6 +9,7 @@ import {
   formatDate,
 } from './shared';
 import { clinicalSections } from './discharge-sections';
+import { isReleased } from 'src/lab/results/release';
 import { summarizeResult } from 'src/lab/results/summarize-result';
 
 interface DischargeContext {
@@ -31,7 +32,7 @@ export function renderDischargeSummary({ consultation, labOrders, prescriptions 
           <tr>
             <td class="cell code">${escape(i.test?.code ?? '')}</td>
             <td class="cell">${escape(i.test?.name ?? '')}</td>
-            <td class="cell">${escape(summarizeResult(i.test, i.resultData) || '—')}</td>
+            <td class="cell">${escape(isReleased(i) ? summarizeResult(i.test, i.resultData) || '—' : 'Awaiting verification')}</td>
             <td class="cell">${escape(formatDate(i.resultedAt))}</td>
           </tr>
         `,

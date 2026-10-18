@@ -2,11 +2,9 @@ import type { LabOrderItem } from 'src/lab/entities/lab-order-item.entity';
 import type { LabOrder } from 'src/lab/entities/lab-order.entity';
 import { LabOrderItemStatus } from 'src/lab/enums/lab-order-item-status.enum';
 import type { Patient } from 'src/patients/entities/patient.entity';
+import { isReleased } from 'src/lab/results/release';
 import { renderResultTable } from './lab-result-table';
 import { escape, formatDate } from './shared';
-
-const isReleased = (item: LabOrderItem) =>
-  item.status === LabOrderItemStatus.VERIFIED;
 
 /** True when any test still awaits verification, so the copy must say PRELIMINARY. */
 export const isPreliminary = (orders: LabOrder[]) =>
@@ -34,7 +32,7 @@ export function testRows(
       (item) => `
         <tr>
           <td class="cell"><span class="code">${escape(item.test?.code ?? '')}</span><br/>${escape(item.test?.name ?? '')}</td>
-          <td class="cell">${renderResultTable(item, patient)}${item.resultNotes ? `<div class="muted">${escape(item.resultNotes)}</div>` : ''}</td>
+          <td class="cell">${isReleased(item) ? `${renderResultTable(item, patient)}${item.resultNotes ? `<div class="muted">${escape(item.resultNotes)}</div>` : ''}` : '<span class="muted">Awaiting verification</span>'}</td>
           <td class="cell">${statusNote(item, amended)}</td>
         </tr>`,
     )

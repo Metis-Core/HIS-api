@@ -27,6 +27,7 @@ import { LabOrdersService } from './lab-orders.service';
 import { CancelLabOrderDto } from './dto/cancel-lab-order.dto';
 import { LabTestsService } from './lab-tests.service';
 import { PaginationQueryDTO } from 'common/pagination';
+import { releaseFor } from './results/release';
 
 @Controller('lab')
 export class LabController {
@@ -86,25 +87,37 @@ export class LabController {
     UserRole.ADMIN,
     UserRole.SUPER_ADMIN,
   )
-  findAllOrders(@Query() query: QueryLabOrdersDto) {
-    return this.labOrdersService.search(query);
+  async findAllOrders(
+    @Query() query: QueryLabOrdersDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    const page = await this.labOrdersService.search(query);
+    releaseFor(user.role, page.items);
+    return page;
   }
 
   @Get('orders/patient/:patientId')
   @Roles(RoleGroups.CLINICAL_STAFF)
-  findOrdersByPatient(
+  async findOrdersByPatient(
     @Param('patientId', ParseUUIDPipe) patientId: string,
     @Query() query: PaginationQueryDTO,
+    @CurrentUser() user: AuthenticatedUser,
   ) {
-    return this.labOrdersService.findByPatient(patientId, query);
+    const page = await this.labOrdersService.findByPatient(patientId, query);
+    releaseFor(user.role, page.items);
+    return page;
   }
 
   @Get('orders/consultation/:consultationId')
   @Roles(RoleGroups.CLINICAL_STAFF)
-  findOrdersByConsultation(
+  async findOrdersByConsultation(
     @Param('consultationId', ParseUUIDPipe) consultationId: string,
+    @CurrentUser() user: AuthenticatedUser,
   ) {
-    return this.labOrdersService.findByConsultation(consultationId);
+    return releaseFor(
+      user.role,
+      await this.labOrdersService.findByConsultation(consultationId),
+    );
   }
 
   @Get('orders/:id')
@@ -115,8 +128,11 @@ export class LabController {
     UserRole.ADMIN,
     UserRole.SUPER_ADMIN,
   )
-  findOneOrder(@Param('id', ParseUUIDPipe) id: string) {
-    return this.labOrdersService.findOne(id);
+  async findOneOrder(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return releaseFor(user.role, await this.labOrdersService.findOne(id));
   }
 
   @Patch('orders/:id')
