@@ -3,6 +3,7 @@ import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { RequestContextInterceptor } from 'core/request-context/request-context.interceptor';
 import { AllExceptionsFilter } from 'common/filters/all-exceptions.filter';
 import { EventEmitterModule } from '@nestjs/event-emitter';
+import { ScheduleModule } from '@nestjs/schedule';
 import { DatabaseModule } from 'core/database/database.module';
 import { SecurityModule } from 'core/security/security.module';
 import { JwtAuthGuard } from 'core/guards/jwt-auth.guard';
@@ -12,10 +13,12 @@ import { AppService } from './app.service';
 import { AnalyticsModule } from './analytics/analytics.module';
 import { AuditLogsModule } from './auditLogs/audit-logs.module';
 import { AuthModule } from './auth/auth.module';
+import { AvailabilityModule } from './availability/availability.module';
 import { ConsultationModule } from './consultation/consultation.module';
 import { ContactsModule } from './contacts/contacts.module';
 import { AdmissionsModule } from './admissions/admissions.module';
 import { DiagnosesModule } from './diagnoses/diagnoses.module';
+import { DoctorsModule } from './doctors/doctors.module';
 import { InventoryModule } from './inventory/inventory.module';
 import { LabModule } from './lab/lab.module';
 import { NotificationsModule } from './notifications/notifications.module';
@@ -32,10 +35,13 @@ import { DocumentsModule } from './documents/documents.module';
 @Module({
   imports: [
     EventEmitterModule.forRoot({ wildcard: true }),
+    ScheduleModule.forRoot(),
     DatabaseModule,
     SecurityModule,
     AuthModule,
     UsersModule,
+    AvailabilityModule,
+    DoctorsModule,
     PharmacyModule,
     NotificationsModule,
     PaymentsModule,

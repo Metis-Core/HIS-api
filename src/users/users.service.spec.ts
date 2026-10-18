@@ -1,7 +1,11 @@
 import { BadRequestException, ConflictException } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
+import { UserRole } from 'common/enums/userRoles.enum';
+import { AccountStatus } from 'common/enums/userStatus.enum';
 import { PasswordService } from 'common/services/password.service';
+import { UserAccountChangedEvent } from './events/user-account-changed.event';
 import { User } from './entities/user.entity';
 import { UsersService } from './users.service';
 
@@ -21,6 +25,7 @@ describe('UsersService', () => {
     createQueryBuilder: jest.fn(() => queryBuilder),
   };
   const passwords = { hash: jest.fn(), verify: jest.fn() };
+  const events = { emit: jest.fn() };
 
   beforeEach(async () => {
     jest.clearAllMocks();
@@ -35,6 +40,7 @@ describe('UsersService', () => {
           provide: PasswordService,
           useValue: passwords,
         },
+        { provide: EventEmitter2, useValue: events },
       ],
     }).compile();
 
@@ -43,6 +49,55 @@ describe('UsersService', () => {
 
   it('should be defined', () => {
     expect(service).toBeDefined();
+  });
+
+  describe('account changes', () => {
+    const admin = { id: 'admin-1', role: UserRole.ADMIN };
+    const doctor = () => ({
+      id: 'doc-1',
+      role: UserRole.DOCTOR,
+      status: AccountStatus.ACTIVE,
+    });
+
+    it('announces a suspension so waiting patients are moved', async () => {
+      repository.findOne.mockResolvedValue(doctor());
+      repository.save.mockImplementation((user: unknown) => user);
+
+      await service.updateAsActor(
+        'doc-1',
+        { status: AccountStatus.SUSPENDED },
+        admin as never,
+      );
+
+      expect(events.emit).toHaveBeenCalledWith(
+        UserAccountChangedEvent.channel,
+        new UserAccountChangedEvent('doc-1'),
+      );
+    });
+
+    it('stays quiet when neither role nor status changed', async () => {
+      repository.findOne.mockResolvedValue(doctor());
+      repository.save.mockImplementation((user: unknown) => user);
+
+      await service.updateAsActor(
+        'doc-1',
+        { department: undefined },
+        admin as never,
+      );
+
+      expect(events.emit).not.toHaveBeenCalled();
+    });
+
+    it('announces a deletion', async () => {
+      repository.findOne.mockResolvedValue(doctor());
+
+      await service.removeAsActor('doc-1', admin as never);
+
+      expect(events.emit).toHaveBeenCalledWith(
+        UserAccountChangedEvent.channel,
+        new UserAccountChangedEvent('doc-1'),
+      );
+    });
   });
 
   describe('updateOwnProfile', () => {

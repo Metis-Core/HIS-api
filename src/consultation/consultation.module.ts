@@ -3,6 +3,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { AdmissionsModule } from 'src/admissions/admissions.module';
 import { InventoryItem } from 'src/inventory/entities/inventory-item.entity';
 import { DiagnosesModule } from 'src/diagnoses/diagnoses.module';
+import { DoctorsModule } from 'src/doctors/doctors.module';
 import { LabModule } from 'src/lab/lab.module';
 import { PatientsModule } from 'src/patients/patients.module';
 import { PharmacyModule } from 'src/pharmacy/pharmacy.module';
@@ -32,6 +33,7 @@ import { Consultation } from './entities/consultation.entity';
     ]),
     AdmissionsModule,
     DiagnosesModule,
+    DoctorsModule,
     PatientsModule,
     UsersModule,
     QueueModule,

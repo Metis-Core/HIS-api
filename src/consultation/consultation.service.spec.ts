@@ -7,6 +7,7 @@ import {
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { UserRole } from 'common/enums/userRoles.enum';
+import { DoctorAssignmentService } from 'src/doctors/doctor-assignment.service';
 import { ConsultationDiagnosesService } from './consultation-diagnoses.service';
 import { ConsultationReferencesService } from './consultation-references.service';
 import { ConsultationService } from './consultation.service';
@@ -31,6 +32,7 @@ const references = {
   assertVisitOfPatient: jest.fn(),
 };
 const diagnoses = { resolve: jest.fn(), replace: jest.fn() };
+const assignment = { claim: jest.fn() };
 const doctor = { id: 'd1', role: UserRole.DOCTOR };
 const open = {
   id: 'c1',
@@ -52,6 +54,7 @@ describe('ConsultationService', () => {
         },
         { provide: ConsultationReferencesService, useValue: references },
         { provide: ConsultationDiagnosesService, useValue: diagnoses },
+        { provide: DoctorAssignmentService, useValue: assignment },
       ],
     }).compile();
     service = module.get(ConsultationService);

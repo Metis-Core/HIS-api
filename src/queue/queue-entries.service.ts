@@ -5,7 +5,7 @@ import {
 } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, Repository } from 'typeorm';
+import { Brackets, In, Repository } from 'typeorm';
 import { Department } from 'common/enums/department.enum';
 import { UserRole } from 'common/enums/userRoles.enum';
 import { QueueEntry } from './entities/queue-entry.entity';
@@ -48,16 +48,51 @@ export class QueueEntriesService {
 
   async findByDepartment(
     department: Department,
-    statuses: QueueEntryStatus[] = [
-      QueueEntryStatus.WAITING,
-      QueueEntryStatus.CALLED,
-      QueueEntryStatus.IN_SERVICE,
-    ],
+    statuses: QueueEntryStatus[] = [...OPEN_STATUSES],
+    doctorId?: string,
   ): Promise<QueueEntry[]> {
-    return this.entries.find({
-      where: { department, status: In(statuses) },
-      relations: { visit: { patient: true }, servedBy: true },
-      order: { priority: 'DESC', createdAt: 'ASC' },
+    const query = this.entries
+      .createQueryBuilder('entry')
+      .leftJoinAndSelect('entry.visit', 'visit')
+      .leftJoinAndSelect('visit.patient', 'patient')
+      .leftJoinAndSelect('visit.assignedDoctor', 'assignedDoctor')
+      .leftJoinAndSelect('entry.servedBy', 'servedBy')
+      .where('entry.department = :department', { department })
+      .andWhere('entry.status IN (:...statuses)', { statuses });
+    if (doctorId) {
+      query.andWhere(
+        new Brackets((mine) =>
+          mine
+            .where('visit.assignedDoctorId = :doctorId', { doctorId })
+            .orWhere(
+              `visit.assignedDoctorId IS NULL AND NOT EXISTS (
+              SELECT 1 FROM "queue_entries" earlier
+              WHERE earlier."visitId" = entry."visitId"
+                AND earlier."deletedAt" IS NULL
+                AND earlier."sequenceNumber" < entry."sequenceNumber"
+                AND earlier."status" IN (:...open))`,
+              { open: OPEN_STATUSES },
+            ),
+        ),
+      );
+    }
+    return query
+      .orderBy('entry.priority', 'DESC')
+      .addOrderBy('entry.createdAt', 'ASC')
+      .getMany();
+  }
+
+  async findOpenEntryForPatient(
+    patientId: string,
+    department: Department,
+  ): Promise<QueueEntry | null> {
+    return this.entries.findOne({
+      where: {
+        department,
+        status: In(OPEN_STATUSES as QueueEntryStatus[]),
+        visit: { patientId },
+      },
+      order: { createdAt: 'DESC' },
     });
   }
 
