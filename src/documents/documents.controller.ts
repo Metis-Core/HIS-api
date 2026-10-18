@@ -11,6 +11,7 @@ import { RoleGroups } from 'common/access/role-groups';
 import { Roles } from 'common/decorators/roles.decorator';
 import { UserRole } from 'common/enums/userRoles.enum';
 import { DocumentsService } from './documents.service';
+import { LabDocumentsService } from './lab-documents.service';
 
 // Patient documents must never be cached by browsers or proxies.
 function sendDocument(res: Response, html: string): void {
@@ -20,7 +21,10 @@ function sendDocument(res: Response, html: string): void {
 
 @Controller('documents')
 export class DocumentsController {
-  constructor(private readonly documents: DocumentsService) {}
+  constructor(
+    private readonly documents: DocumentsService,
+    private readonly labDocuments: LabDocumentsService,
+  ) {}
 
   @Get('lab-order/:id')
   @Roles(RoleGroups.CLINICAL_STAFF, UserRole.LAB_TECH)
@@ -29,7 +33,18 @@ export class DocumentsController {
     @Query('print') print: string | undefined,
     @Res() res: Response,
   ) {
-    const html = await this.documents.renderLabOrder(id, print === '1');
+    const html = await this.labDocuments.renderOrder(id, print === '1');
+    sendDocument(res, html);
+  }
+
+  @Get('lab-report/visit/:visitId')
+  @Roles(RoleGroups.CLINICAL_STAFF, UserRole.LAB_TECH)
+  async labVisitReport(
+    @Param('visitId', ParseUUIDPipe) visitId: string,
+    @Query('print') print: string | undefined,
+    @Res() res: Response,
+  ) {
+    const html = await this.labDocuments.renderVisit(visitId, print === '1');
     sendDocument(res, html);
   }
 
