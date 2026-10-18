@@ -43,6 +43,7 @@ export class VisitController {
   async getQueues() {
     const visits = await this.visitService.findManyWithPagination({
       relations: { queueEntries: true, patient: true },
+      order: { createdAt: 'DESC', queueEntries: { sequenceNumber: 'ASC' } },
       take: 100,
     });
     return formatResponse(visits);

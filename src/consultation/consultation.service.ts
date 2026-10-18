@@ -311,9 +311,11 @@ export class ConsultationService extends BaseCrudService<Consultation> {
 
     let queueUpdate: unknown | null = null;
     if (consultation.visitId) {
-      if (dto.nextIntents && dto.nextIntents.length > 0) {
-        await this.queueEntries.appendIntents(consultation.visitId, dto.nextIntents);
-      }
+      await this.queueEntries.routeFromDoctor(
+        consultation.visitId,
+        consultation.department,
+        dto.nextIntents ?? [],
+      );
       const result = await this.queueEntries.completeCurrentFor(
         consultation.visitId,
         consultation.department,

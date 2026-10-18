@@ -2,6 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { DeepPartial, Repository } from 'typeorm';
+import { Department } from 'common/enums/department.enum';
 import { PatientsService } from 'src/patients/patients.service';
 import { UsersService } from 'src/users/users.service';
 import { CreateVisitDTO } from './dto/create-visit.dto';
@@ -61,14 +62,9 @@ export class VisitsService extends BaseCrudService<Visit> {
       },
     });
 
-    const entries = CHECK_IN_INTENTS.map((item, index) => ({
-      visitId: visit.id,
-      department: intentDepartmentMap[item],
-      status: QueueEntryStatus.WAITING,
-      priority: 5,
-      sequenceNumber: index + 1,
-    }));
-    await this.queueEntriesRepository.save(entries);
+    await this.queueEntriesRepository.save(
+      this.checkInEntries(visit.id, handler),
+    );
 
     this.events.emit(
       VisitCheckedInEvent.channel,
@@ -76,6 +72,32 @@ export class VisitsService extends BaseCrudService<Visit> {
     );
 
     return visit;
+  }
+
+  // Reception is recorded as a finished first stage so waits are measured from registration.
+  private checkInEntries(visitId: string, handler: string): QueueEntry[] {
+    const now = new Date();
+    const reception = this.queueEntriesRepository.create({
+      visitId,
+      department: Department.RECEPTION,
+      status: QueueEntryStatus.COMPLETED,
+      priority: 5,
+      sequenceNumber: 1,
+      servedById: handler,
+      calledAt: now,
+      startedAt: now,
+      completedAt: now,
+    });
+    const next = CHECK_IN_INTENTS.map((intent, index) =>
+      this.queueEntriesRepository.create({
+        visitId,
+        department: intentDepartmentMap[intent],
+        status: QueueEntryStatus.WAITING,
+        priority: 5,
+        sequenceNumber: index + 2,
+      }),
+    );
+    return [reception, ...next];
   }
 
   override async update(

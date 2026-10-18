@@ -1,8 +1,4 @@
-import {
-  BadRequestException,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
@@ -17,6 +13,7 @@ import {
   QueueEntryStartedEvent,
 } from './events/queue.events';
 import { intentDepartmentMap } from './intent-department.map';
+import { PlannedStage, planDoctorRouting } from './journey/routing-plan';
 import { assertTransition } from './queue-state-machine';
 
 const OPEN_STATUSES: readonly QueueEntryStatus[] = [
@@ -87,7 +84,10 @@ export class QueueEntriesService {
     return entry;
   }
 
-  async complete(id: string, notes?: string): Promise<{ entry: QueueEntry; next: QueueEntry | null }> {
+  async complete(
+    id: string,
+    notes?: string,
+  ): Promise<{ entry: QueueEntry; next: QueueEntry | null }> {
     const entry = await this.findOneOrFail(id);
     if (entry.status !== QueueEntryStatus.COMPLETED) {
       assertTransition(entry.status, QueueEntryStatus.COMPLETED);
@@ -101,7 +101,10 @@ export class QueueEntriesService {
     return { entry, next };
   }
 
-  async skip(id: string, notes?: string): Promise<{ entry: QueueEntry; next: QueueEntry | null }> {
+  async skip(
+    id: string,
+    notes?: string,
+  ): Promise<{ entry: QueueEntry; next: QueueEntry | null }> {
     const entry = await this.findOneOrFail(id);
     assertTransition(entry.status, QueueEntryStatus.SKIPPED);
     entry.status = QueueEntryStatus.SKIPPED;
@@ -156,21 +159,54 @@ export class QueueEntriesService {
     visitId: string,
     intents: VisitIntenentsEnum[],
   ): Promise<QueueEntry[]> {
-    if (!intents || intents.length === 0) return [];
+    return this.appendStages(
+      visitId,
+      (intents ?? []).map((intent) => ({ intent })),
+    );
+  }
+
+  /** Queues the doctor's requested stages in journey order (diagnostics, review, treatment, billing). */
+  async routeFromDoctor(
+    visitId: string,
+    doctorDepartment: Department,
+    requested: VisitIntenentsEnum[],
+  ): Promise<QueueEntry[]> {
+    const open = await this.entries.find({
+      where: { visitId, status: In(OPEN_STATUSES as QueueEntryStatus[]) },
+      order: { sequenceNumber: 'ASC' },
+    });
+    const current = open.find((entry) => entry.department === doctorDepartment);
+    const openDepartments = open
+      .filter((entry) => entry.id !== current?.id)
+      .map((entry) => entry.department);
+    return this.appendStages(
+      visitId,
+      planDoctorRouting(requested, openDepartments),
+    );
+  }
+
+  private async appendStages(
+    visitId: string,
+    stages: PlannedStage[],
+  ): Promise<QueueEntry[]> {
+    if (stages.length === 0) return [];
     const existing = await this.entries.find({
       where: { visitId },
       order: { sequenceNumber: 'DESC' },
       take: 1,
     });
     const startSeq = (existing[0]?.sequenceNumber ?? 0) + 1;
-    const rows = intents.map((intent, i) => ({
-      visitId,
-      department: intentDepartmentMap[intent],
-      status: QueueEntryStatus.WAITING,
-      priority: 5,
-      sequenceNumber: startSeq + i,
-    }));
-    const saved = await this.entries.save(rows as QueueEntry[]);
+    const rows = stages.map((stage, i) =>
+      this.entries.create({
+        visitId,
+        department: intentDepartmentMap[stage.intent],
+        status: QueueEntryStatus.WAITING,
+        priority: 5,
+        sequenceNumber: startSeq + i,
+        metadata: stage.review ? { review: true } : null,
+      }),
+    );
+    const saved = await this.entries.save(rows);
     for (const s of saved) {
       this.events.emit(
         QueueEntryCreatedEvent.channel,
@@ -227,7 +263,10 @@ export class QueueEntriesService {
   }
 
   private emit(
-    ctor: typeof QueueEntryCalledEvent | typeof QueueEntryStartedEvent | typeof QueueEntryCompletedEvent,
+    ctor:
+      | typeof QueueEntryCalledEvent
+      | typeof QueueEntryStartedEvent
+      | typeof QueueEntryCompletedEvent,
     entry: QueueEntry,
   ) {
     if (!entry.visit) return;

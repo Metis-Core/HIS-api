@@ -15,4 +15,5 @@ export enum VisitIntenentsEnum {
   SURGERY = 'surgery',
   POSTOPERATIVE = 'postoperative',
   FOLLOWUP = 'follow-up',
+  BILLING = 'billing',
 }
