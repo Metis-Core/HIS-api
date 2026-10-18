@@ -19,7 +19,7 @@
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
     "test:e2e": "jest --config ./test/jest-e2e.json",
     "typeorm": "ts-node -r tsconfig-paths/register ./node_modules/typeorm/cli.js",
-    "user:create-admin": "ts-node -r tsconfig-paths/register core/database/scripts/bootstrap-admin.ts",
+    "user:create-admin": "ts-node -r tsconfig-paths/register core/database/scripts/create-admin.ts",
     "user:seed": "ts-node -r tsconfig-paths/register core/database/scripts/seed-users.ts",
     "db:seed:icd": "ts-node -r tsconfig-paths/register core/database/scripts/seed-diagnosis-codes.ts",
     "db:seed:lab": "ts-node -r tsconfig-paths/register core/database/scripts/seed-lab-catalogue.ts",

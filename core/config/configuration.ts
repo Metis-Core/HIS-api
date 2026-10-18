@@ -1,9 +1,17 @@
-export default () => ({
-  port: parseInt(process.env.PORT ?? '8000', 10),
-  corsOrigins: (process.env.CORS_ORIGINS ?? '')
+const DEVELOPMENT_CORS_ORIGINS = ['http://localhost:4000'];
+
+const resolveCorsOrigins = (): string[] => {
+  const configured = (process.env.CORS_ORIGINS ?? '')
     .split(',')
     .map((origin) => origin.trim())
-    .filter(Boolean),
+    .filter(Boolean);
+  if (process.env.NODE_ENV === 'production') return configured;
+  return [...new Set([...configured, ...DEVELOPMENT_CORS_ORIGINS])];
+};
+
+export default () => ({
+  port: parseInt(process.env.PORT ?? '8000', 10),
+  corsOrigins: resolveCorsOrigins(),
   database: {
     host: process.env.DB_HOST,
     port: parseInt(process.env.DB_PORT ?? '5432', 10),
