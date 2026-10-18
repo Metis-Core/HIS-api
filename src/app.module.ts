@@ -22,6 +22,7 @@ import { DoctorsModule } from './doctors/doctors.module';
 import { InventoryModule } from './inventory/inventory.module';
 import { LabModule } from './lab/lab.module';
 import { NotificationsModule } from './notifications/notifications.module';
+import { OrdersModule } from './orders/orders.module';
 import { OtpModule } from './otp/otp.module';
 import { PatientsModule } from './patients/patients.module';
 import { PaymentsModule } from './payments/payments.module';
@@ -45,6 +46,7 @@ import { DocumentsModule } from './documents/documents.module';
     PharmacyModule,
     NotificationsModule,
     PaymentsModule,
+    OrdersModule,
     LabModule,
     PatientsModule,
     AuditLogsModule,

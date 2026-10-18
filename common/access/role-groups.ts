@@ -105,6 +105,11 @@ export const RoleGroups = {
     ],
   ),
 
+  FINANCE_MANAGERS: define(
+    'Staff who may void payments, close out the day and review the ledger.',
+    [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.ACCOUNTANT],
+  ),
+
   BILLING: define('Staff permitted to settle or waive visit charges.', [
     UserRole.SUPER_ADMIN,
     UserRole.ADMIN,
