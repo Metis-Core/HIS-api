@@ -12,17 +12,19 @@ import { CurrentUser } from 'common/decorators/current-user.decorator';
 import { RoleGroups } from 'common/access/role-groups';
 import { Roles } from 'common/decorators/roles.decorator';
 import type { AuthenticatedUser } from 'common/interfaces/authenticated-user.interface';
-import { CreateLabOrderDto } from 'src/lab/dto/create-lab-order.dto';
 import { LabOrdersService } from 'src/lab/lab-orders.service';
-import { CreatePrescriptionDto } from 'src/pharmacy/dto/create-prescription.dto';
 import { PharmacyService } from 'src/pharmacy/pharmacy.service';
-import { ConsultationService } from './consultation.service';
+import { ConsultationOrdersService } from './consultation-orders.service';
+import {
+  CreateConsultationLabOrderDTO,
+  CreateConsultationPrescriptionDTO,
+} from './dto/consultation-orders.dto';
 
 /** Lab orders and prescriptions raised from inside a consultation. */
 @Controller('consultations')
 export class ConsultationOrdersController {
   constructor(
-    private readonly consultationService: ConsultationService,
+    private readonly orders: ConsultationOrdersService,
     private readonly labOrdersService: LabOrdersService,
     private readonly pharmacyService: PharmacyService,
   ) {}
@@ -36,46 +38,23 @@ export class ConsultationOrdersController {
   @Post(':id/lab-orders')
   @Roles(RoleGroups.PROVIDERS)
   @HttpCode(HttpStatus.CREATED)
-  async createLabOrder(
+  createLabOrder(
     @Param('id', ParseUUIDPipe) id: string,
-    @Body()
-    dto: Omit<CreateLabOrderDto, 'consultationId' | 'patientId'> & {
-      patientId?: string;
-    },
+    @Body() dto: CreateConsultationLabOrderDTO,
     @CurrentUser() user: AuthenticatedUser,
   ) {
-    const consultation = await this.consultationService.findEditable(id, user);
-    return this.labOrdersService.createOrder(
-      {
-        ...dto,
-        patientId: consultation.patientId,
-        consultationId: id,
-        visitId: consultation.visitId ?? undefined,
-      },
-      user.id,
-    );
+    return this.orders.orderLabs(id, dto, user);
   }
 
   @Post(':id/prescriptions')
   @Roles(RoleGroups.PROVIDERS)
   @HttpCode(HttpStatus.CREATED)
-  async createPrescription(
+  createPrescription(
     @Param('id', ParseUUIDPipe) id: string,
-    @Body()
-    dto: Omit<CreatePrescriptionDto, 'consultationId' | 'patientId'> & {
-      patientId?: string;
-    },
+    @Body() dto: CreateConsultationPrescriptionDTO,
     @CurrentUser() user: AuthenticatedUser,
   ) {
-    const consultation = await this.consultationService.findEditable(id, user);
-    return this.pharmacyService.createPrescription(
-      {
-        ...dto,
-        patientId: consultation.patientId,
-        consultationId: id,
-      },
-      user.id,
-    );
+    return this.orders.prescribe(id, dto, user);
   }
 
   @Get(':id/prescriptions')

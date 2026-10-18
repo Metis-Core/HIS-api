@@ -9,6 +9,7 @@ import { ConsultationAddendaController } from './consultation-addenda.controller
 import { ConsultationAddendaService } from './consultation-addenda.service';
 import { ConsultationLifecycleService } from './consultation-lifecycle.service';
 import { ConsultationOrdersController } from './consultation-orders.controller';
+import { ConsultationOrdersService } from './consultation-orders.service';
 import { ConsultationQueryService } from './consultation-query.service';
 import { ConsultationController } from './consultation.controller';
 import { ConsultationService } from './consultation.service';
@@ -34,6 +35,7 @@ import { Consultation } from './entities/consultation.entity';
     ConsultationQueryService,
     ConsultationLifecycleService,
     ConsultationAddendaService,
+    ConsultationOrdersService,
   ],
   exports: [ConsultationService, TypeOrmModule],
 })
