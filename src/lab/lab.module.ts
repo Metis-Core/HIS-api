@@ -9,6 +9,7 @@ import { LabOrder } from './entities/lab-order.entity';
 import { LabTest } from './entities/lab-test.entity';
 import { LabController } from './lab.controller';
 import { LabOrdersService } from './lab-orders.service';
+import { LabResultsService } from './lab-results.service';
 import { LabTestsService } from './lab-tests.service';
 
 @Module({
@@ -20,7 +21,7 @@ import { LabTestsService } from './lab-tests.service';
     QueueModule,
   ],
   controllers: [LabController],
-  providers: [LabTestsService, LabOrdersService],
+  providers: [LabTestsService, LabOrdersService, LabResultsService],
   exports: [LabTestsService, LabOrdersService],
 })
 export class LabModule {}

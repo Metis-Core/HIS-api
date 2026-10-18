@@ -9,14 +9,12 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, In, Repository } from 'typeorm';
 import { BaseCrudService } from 'common/services/crud.service';
 import { IPagination } from 'common/response-format';
-import { Department } from 'common/enums/department.enum';
 import { PatientsService } from 'src/patients/patients.service';
 import { QueueEntriesService } from 'src/queue/queue-entries.service';
 import { VisitIntenentsEnum } from 'src/queue/enums/visit-type.enum';
 import { UsersService } from 'src/users/users.service';
 import { CreateLabOrderDto } from './dto/create-lab-order.dto';
 import { QueryLabOrdersDto } from './dto/query-lab-orders.dto';
-import { UpdateLabOrderItemDto } from './dto/update-lab-order-item.dto';
 import { UpdateLabOrderDto } from './dto/update-lab-order.dto';
 import { LabOrderItem } from './entities/lab-order-item.entity';
 import { LabOrder } from './entities/lab-order.entity';
@@ -25,9 +23,7 @@ import { LabOrderItemStatus } from './enums/lab-order-item-status.enum';
 import { LabOrderStatus } from './enums/lab-order-status.enum';
 import { LabPriority } from './enums/lab-priority.enum';
 import { LabOrderCreatedEvent } from './events/lab-order-created.event';
-import { LabOrderCompletedEvent } from './events/lab-order-completed.event';
 import { LabOrderCancelledEvent } from './events/lab-order-cancelled.event';
-import { LabResultReadyEvent } from './events/lab-result-ready.event';
 import { PaginationQueryDTO, pageWindow, toPage } from 'common/pagination';
 import { wherePatientMatches } from 'common/utils/query-list';
 
@@ -225,88 +221,5 @@ export class LabOrdersService extends BaseCrudService<LabOrder> {
       );
       return cancelled;
     });
-  }
-
-  async updateItem(
-    orderId: string,
-    itemId: string,
-    dto: UpdateLabOrderItemDto,
-    resultedById: string,
-  ): Promise<LabOrder> {
-    const item = await this.labOrderItemsRepository.findOne({
-      where: { id: itemId, orderId },
-    });
-    if (!item) {
-      throw new NotFoundException('Lab order item not found');
-    }
-
-    if (dto.status !== undefined) item.status = dto.status;
-    if (dto.resultValue !== undefined) item.resultValue = dto.resultValue?.trim() || null;
-    if (dto.resultNotes !== undefined) item.resultNotes = dto.resultNotes?.trim() || null;
-    if (dto.isAbnormal !== undefined) item.isAbnormal = dto.isAbnormal;
-
-    if (dto.status === LabOrderItemStatus.COLLECTED && !item.collectedAt) {
-      item.collectedAt = new Date();
-    }
-    if (dto.status === LabOrderItemStatus.RESULT_READY) {
-      item.resultedAt = new Date();
-      item.resultedById = resultedById;
-    }
-
-    await this.labOrderItemsRepository.save(item);
-    await this.reconcileOrderStatus(orderId);
-    const order = await this.findOne(orderId);
-
-    // A fully completed order is announced by LabOrderCompletedEvent instead.
-    if (dto.status === LabOrderItemStatus.RESULT_READY && order.status !== LabOrderStatus.COMPLETED) {
-      this.eventEmitter.emit(
-        LabResultReadyEvent.name,
-        new LabResultReadyEvent(
-          order.id,
-          item.id,
-          order.patientId,
-          order.orderedById,
-          order.items.find((i) => i.id === item.id)?.test?.name ?? 'Lab test',
-          item.isAbnormal,
-        ),
-      );
-    }
-    return order;
-  }
-
-  private async reconcileOrderStatus(orderId: string): Promise<void> {
-    const items = await this.labOrderItemsRepository.find({ where: { orderId } });
-    const order = await this.labOrdersRepository.findOneOrFail({ where: { id: orderId } });
-
-    if (order.status === LabOrderStatus.CANCELLED) return;
-
-    const anyInProgress = items.some((i) =>
-      [LabOrderItemStatus.COLLECTED, LabOrderItemStatus.IN_PROCESS].includes(i.status),
-    );
-    const allTerminal = items.every((i) =>
-      [LabOrderItemStatus.RESULT_READY, LabOrderItemStatus.CANCELLED].includes(i.status),
-    );
-    const anyReady = items.some((i) => i.status === LabOrderItemStatus.RESULT_READY);
-
-    if (allTerminal && anyReady) {
-      order.status = LabOrderStatus.COMPLETED;
-      order.completedAt = order.completedAt ?? new Date();
-      await this.labOrdersRepository.save(order);
-      if (order.visitId) {
-        await this.queueEntries.completeCurrentFor(order.visitId, Department.MAIN_LABORATORY);
-      }
-      this.eventEmitter.emit(
-        LabOrderCompletedEvent.name,
-        new LabOrderCompletedEvent(
-          order.id,
-          order.patientId,
-          order.orderedById,
-          items.filter((i) => i.isAbnormal).length,
-        ),
-      );
-    } else if (anyInProgress && order.status === LabOrderStatus.PENDING) {
-      order.status = LabOrderStatus.IN_PROGRESS;
-      await this.labOrdersRepository.save(order);
-    }
   }
 }

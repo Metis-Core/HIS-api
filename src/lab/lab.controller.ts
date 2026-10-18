@@ -24,6 +24,7 @@ import { UpdateLabOrderItemDto } from './dto/update-lab-order-item.dto';
 import { UpdateLabOrderDto } from './dto/update-lab-order.dto';
 import { UpdateLabTestDto } from './dto/update-lab-test.dto';
 import { LabOrdersService } from './lab-orders.service';
+import { LabResultsService } from './lab-results.service';
 import { LabTestsService } from './lab-tests.service';
 import { PaginationQueryDTO } from 'common/pagination';
 
@@ -32,6 +33,7 @@ export class LabController {
   constructor(
     private readonly labTestsService: LabTestsService,
     private readonly labOrdersService: LabOrdersService,
+    private readonly labResultsService: LabResultsService,
   ) {}
 
   @Post('tests')
@@ -131,6 +133,6 @@ export class LabController {
     @Body() dto: UpdateLabOrderItemDto,
     @CurrentUser() user: AuthenticatedUser,
   ) {
-    return this.labOrdersService.updateItem(orderId, itemId, dto, user.id);
+    return this.labResultsService.updateItem(orderId, itemId, dto, user.id);
   }
 }
