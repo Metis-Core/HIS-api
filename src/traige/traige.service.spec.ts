@@ -21,7 +21,10 @@ describe('TraigeService', () => {
     findOne: jest.fn(),
     createQueryBuilder: jest.fn(),
   };
-  const visits = { raiseCategory: jest.fn() };
+  const visits = {
+    raiseCategory: jest.fn(),
+    findByStringId: jest.fn().mockResolvedValue({ metadata: null }),
+  };
   const assignment = { assignIfNeeded: jest.fn() };
   const queueEntries = {
     ensureIntent: jest.fn(),
@@ -113,5 +116,35 @@ describe('TraigeService', () => {
       Department.TRIAGE,
     );
     expect(assignment.assignIfNeeded).toHaveBeenCalledWith('v9');
+  });
+
+  it('does not send a patient who came only for a procedure on to a doctor', async () => {
+    repository.save.mockResolvedValue({ id: 't1' });
+    repository.findOne.mockResolvedValue({
+      id: 't1',
+      patientId: 'p1',
+      acuity: TriageAcuity.LEVEL_4,
+      status: TriageStatus.COMPLETED,
+    });
+    queueEntries.findOpenEntryForPatient.mockResolvedValue({ visitId: 'v9' });
+    visits.findByStringId.mockResolvedValueOnce({
+      metadata: { initialIntents: ['triage', 'surgery'] },
+    });
+
+    await service.createTriage(
+      {
+        patientId: 'p1',
+        acuity: TriageAcuity.LEVEL_4,
+        chiefComplaint: 'Wound dressing',
+      },
+      'nurse-1',
+    );
+
+    expect(queueEntries.completeCurrentFor).toHaveBeenCalledWith(
+      'v9',
+      Department.TRIAGE,
+    );
+    expect(queueEntries.ensureIntent).not.toHaveBeenCalled();
+    expect(assignment.assignIfNeeded).not.toHaveBeenCalled();
   });
 });

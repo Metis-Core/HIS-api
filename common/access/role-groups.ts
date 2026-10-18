@@ -95,6 +95,17 @@ export const RoleGroups = {
     ],
   ),
 
+  PROCEDURE_ORDERERS: define(
+    'Staff who may order imaging or a procedure: providers, plus reception and nurses for walk-ins.',
+    [
+      UserRole.SUPER_ADMIN,
+      UserRole.ADMIN,
+      UserRole.DOCTOR,
+      UserRole.NURSE,
+      UserRole.RECEPTIONIST,
+    ],
+  ),
+
   LAB_INTAKE: define(
     'Staff who may open a lab-only visit for a walk-in with no consultation.',
     [

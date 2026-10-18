@@ -10,19 +10,10 @@ import { QueueEntryStatus } from './enums/queue-entry-status.enum';
 import { ServiceVisitKind } from './enums/service-visit.enum';
 import { VisitIntenentsEnum, VisitTypeEnum } from './enums/visit-type.enum';
 import { VisitCheckedInEvent } from './events/visit-checked-in.event';
+import { SERVICE_VISIT_INTENT } from './journey/check-in-plan';
 import { priorityFor } from './journey/visit-priority';
 import { LabOnlyVisitsService } from './lab-only-visits.service';
 import { QueueEntriesService } from './queue-entries.service';
-
-export const SERVICE_VISIT_INTENT: Record<
-  ServiceVisitKind,
-  VisitIntenentsEnum
-> = {
-  [ServiceVisitKind.ANTENATAL]: VisitIntenentsEnum.ANTENATAL,
-  [ServiceVisitKind.DELIVERY]: VisitIntenentsEnum.DELIVERY,
-  [ServiceVisitKind.POSTNATAL]: VisitIntenentsEnum.POSTNATAL,
-  [ServiceVisitKind.IMMUNIZATION]: VisitIntenentsEnum.IMMUNIZATION,
-};
 
 const OPEN_STATUSES = [
   QueueEntryStatus.WAITING,

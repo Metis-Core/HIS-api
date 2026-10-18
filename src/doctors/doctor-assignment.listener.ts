@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
 import { Department } from 'common/enums/department.enum';
 import { AvailabilityChangedEvent } from 'src/availability/events/availability-changed.event';
+import { VisitIntenentsEnum } from 'src/queue/enums/visit-type.enum';
 import { QueueEntryCreatedEvent } from 'src/queue/events/queue.events';
 import { VisitCheckedInEvent } from 'src/queue/events/visit-checked-in.event';
 import { UserAccountChangedEvent } from 'src/users/events/user-account-changed.event';
@@ -37,9 +38,27 @@ export class DoctorAssignmentListener {
 
   @OnEvent(VisitCheckedInEvent.channel, { async: true })
   onVisitCheckedIn(event: VisitCheckedInEvent): Promise<void> {
-    return this.safely('emergency check-in', () =>
-      this.assignment.assignEmergency(event.visitId),
-    );
+    return this.safely('check-in', async () => {
+      const consultation = event.intents.includes(
+        VisitIntenentsEnum.CONSULTATION,
+      );
+      if (consultation && event.preferredDoctorId) {
+        await this.assignment.assignRequested(
+          event.visitId,
+          event.preferredDoctorId,
+          event.checkedInById,
+        );
+        return;
+      }
+      await this.assignment.assignEmergency(event.visitId);
+      // Without triage the consultation is the first stage, so the doctor is chosen now.
+      if (
+        consultation &&
+        !event.intents.includes(VisitIntenentsEnum.EXAMINATION)
+      ) {
+        await this.assignment.assignIfNeeded(event.visitId);
+      }
+    });
   }
 
   private async safely(
