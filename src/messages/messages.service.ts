@@ -192,6 +192,17 @@ export class MessagesService {
     return people.map((person) => this.contact(person));
   }
 
+  async contactById(userId: string, id: string): Promise<Contact> {
+    const person = await this.users.findOne({
+      where: { id, status: AccountStatus.ACTIVE },
+      select: { id: true, username: true, role: true },
+    });
+    if (!person || person.id === userId) {
+      throw new NotFoundException('That person cannot receive messages');
+    }
+    return this.contact(person);
+  }
+
   private contact(user: User): Contact {
     return { id: user.id, username: user.username, role: user.role };
   }

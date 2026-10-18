@@ -49,6 +49,14 @@ export class MessagesController {
     return formatResponse(await this.messages.contacts(user.id, query));
   }
 
+  @Get('contacts/:userId')
+  async contact(
+    @Param('userId', ParseUUIDPipe) id: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return formatResponse(await this.messages.contactById(user.id, id));
+  }
+
   @Get('with/:userId')
   async thread(
     @Param('userId', ParseUUIDPipe) otherId: string,
