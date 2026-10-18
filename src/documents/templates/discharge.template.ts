@@ -8,6 +8,7 @@ import {
   escape,
   formatDate,
 } from './shared';
+import { clinicalSections } from './discharge-sections';
 
 interface DischargeContext {
   consultation: Consultation;
@@ -83,34 +84,7 @@ export function renderDischargeSummary({ consultation, labOrders, prescriptions 
 
         <mj-section padding="0 24px">
           <mj-column>
-            <mj-text class="label">Chief complaint</mj-text>
-            <mj-text>${escape(consultation.chiefComplaint)}</mj-text>
-
-            ${
-              consultation.historyOfPresentIllness
-                ? `<mj-text class="label">History of present illness</mj-text><mj-text>${escape(consultation.historyOfPresentIllness)}</mj-text>`
-                : ''
-            }
-            ${
-              consultation.examinationFindings
-                ? `<mj-text class="label">Examination findings</mj-text><mj-text>${escape(consultation.examinationFindings)}</mj-text>`
-                : ''
-            }
-            ${
-              consultation.assessment
-                ? `<mj-text class="label">Assessment</mj-text><mj-text>${escape(consultation.assessment)}</mj-text>`
-                : ''
-            }
-            ${
-              consultation.diagnosis
-                ? `<mj-text class="label">Diagnosis${consultation.icd10Codes ? ` (${escape(consultation.icd10Codes)})` : ''}</mj-text><mj-text>${escape(consultation.diagnosis)}</mj-text>`
-                : ''
-            }
-            ${
-              consultation.plan
-                ? `<mj-text class="label">Plan</mj-text><mj-text>${escape(consultation.plan)}</mj-text>`
-                : ''
-            }
+            ${clinicalSections(consultation)}
           </mj-column>
         </mj-section>
 

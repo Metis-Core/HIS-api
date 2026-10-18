@@ -16,23 +16,22 @@ import { CurrentUser } from 'common/decorators/current-user.decorator';
 import { RoleGroups } from 'common/access/role-groups';
 import { Roles } from 'common/decorators/roles.decorator';
 import type { AuthenticatedUser } from 'common/interfaces/authenticated-user.interface';
-import { CreateLabOrderDto } from 'src/lab/dto/create-lab-order.dto';
-import { LabOrdersService } from 'src/lab/lab-orders.service';
-import { CreatePrescriptionDto } from 'src/pharmacy/dto/create-prescription.dto';
-import { PharmacyService } from 'src/pharmacy/pharmacy.service';
+import { PaginationQueryDTO } from 'common/pagination';
+import { ConsultationLifecycleService } from './consultation-lifecycle.service';
+import { ConsultationQueryService } from './consultation-query.service';
 import { ConsultationService } from './consultation.service';
+import { CancelConsultationDTO } from './dto/cancel-consultation.dto';
 import { CompleteConsultationDto } from './dto/complete-consultation.dto';
 import { CreateConsultationDto } from './dto/create-consultation.dto';
 import { QueryConsultationsDto } from './dto/query-consultations.dto';
 import { UpdateConsultationDto } from './dto/update-consultation.dto';
-import { PaginationQueryDTO } from 'common/pagination';
 
 @Controller('consultations')
 export class ConsultationController {
   constructor(
     private readonly consultationService: ConsultationService,
-    private readonly labOrdersService: LabOrdersService,
-    private readonly pharmacyService: PharmacyService,
+    private readonly queries: ConsultationQueryService,
+    private readonly lifecycle: ConsultationLifecycleService,
   ) {}
 
   @Post()
@@ -42,13 +41,13 @@ export class ConsultationController {
     @Body() dto: CreateConsultationDto,
     @CurrentUser() user: AuthenticatedUser,
   ) {
-    return this.consultationService.create(dto, user.id);
+    return this.consultationService.open(dto, user);
   }
 
   @Get()
   @Roles(RoleGroups.CLINICAL_STAFF)
   findAll(@Query() query: QueryConsultationsDto) {
-    return this.consultationService.search(query);
+    return this.queries.search(query);
   }
 
   @Get('patient/:patientId')
@@ -57,13 +56,13 @@ export class ConsultationController {
     @Param('patientId', ParseUUIDPipe) patientId: string,
     @Query() query: PaginationQueryDTO,
   ) {
-    return this.consultationService.findByPatient(patientId, query);
+    return this.queries.findByPatient(patientId, query);
   }
 
   @Get('visit/:visitId')
   @Roles(RoleGroups.CLINICAL_STAFF)
   findByVisit(@Param('visitId', ParseUUIDPipe) visitId: string) {
-    return this.consultationService.findByVisit(visitId);
+    return this.queries.findByVisit(visitId);
   }
 
   @Get(':id')
@@ -77,8 +76,9 @@ export class ConsultationController {
   update(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: UpdateConsultationDto,
+    @CurrentUser() user: AuthenticatedUser,
   ) {
-    return this.consultationService.update(id, dto);
+    return this.consultationService.edit(id, dto, user);
   }
 
   @Put(':id')
@@ -86,8 +86,9 @@ export class ConsultationController {
   replace(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: UpdateConsultationDto,
+    @CurrentUser() user: AuthenticatedUser,
   ) {
-    return this.consultationService.update(id, dto);
+    return this.consultationService.edit(id, dto, user);
   }
 
   @Post(':id/complete')
@@ -97,78 +98,25 @@ export class ConsultationController {
     @Body() dto: CompleteConsultationDto,
     @CurrentUser() user: AuthenticatedUser,
   ) {
-    return this.consultationService.complete(id, dto, user.role);
+    return this.lifecycle.complete(id, dto, user);
   }
 
   @Post(':id/cancel')
   @Roles(RoleGroups.PROVIDERS)
   cancel(
     @Param('id', ParseUUIDPipe) id: string,
-    @Body('reason') reason?: string,
-  ) {
-    return this.consultationService.cancel(id, reason);
-  }
-
-  @Get(':id/lab-orders')
-  @Roles(RoleGroups.CLINICAL_STAFF)
-  listLabOrders(@Param('id', ParseUUIDPipe) id: string) {
-    return this.labOrdersService.findByConsultation(id);
-  }
-
-  @Post(':id/lab-orders')
-  @Roles(RoleGroups.PROVIDERS)
-  @HttpCode(HttpStatus.CREATED)
-  async createLabOrder(
-    @Param('id', ParseUUIDPipe) id: string,
-    @Body()
-    dto: Omit<CreateLabOrderDto, 'consultationId' | 'patientId'> & {
-      patientId?: string;
-    },
+    @Body() dto: CancelConsultationDTO,
     @CurrentUser() user: AuthenticatedUser,
   ) {
-    const consultation = await this.consultationService.findOne(id);
-    return this.labOrdersService.createOrder(
-      {
-        ...dto,
-        patientId: consultation.patientId,
-        consultationId: id,
-        visitId: consultation.visitId ?? undefined,
-      } as CreateLabOrderDto,
-      user.id,
-    );
-  }
-
-  @Post(':id/prescriptions')
-  @Roles(RoleGroups.PROVIDERS)
-  @HttpCode(HttpStatus.CREATED)
-  async createPrescription(
-    @Param('id', ParseUUIDPipe) id: string,
-    @Body()
-    dto: Omit<CreatePrescriptionDto, 'consultationId' | 'patientId'> & {
-      patientId?: string;
-    },
-    @CurrentUser() user: AuthenticatedUser,
-  ) {
-    const consultation = await this.consultationService.findOne(id);
-    return this.pharmacyService.createPrescription(
-      {
-        ...dto,
-        patientId: consultation.patientId,
-        consultationId: id,
-      } as CreatePrescriptionDto,
-      user.id,
-    );
-  }
-
-  @Get(':id/prescriptions')
-  @Roles(RoleGroups.CLINICAL_STAFF)
-  listPrescriptions(@Param('id', ParseUUIDPipe) id: string) {
-    return this.pharmacyService.search({ consultationId: id });
+    return this.lifecycle.cancel(id, user, dto.reason);
   }
 
   @Delete(':id')
   @Roles(RoleGroups.ADMINS)
-  remove(@Param('id', ParseUUIDPipe) id: string) {
-    return this.consultationService.cancel(id);
+  remove(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.lifecycle.cancel(id, user);
   }
 }

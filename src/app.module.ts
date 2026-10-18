@@ -14,6 +14,8 @@ import { AuditLogsModule } from './auditLogs/audit-logs.module';
 import { AuthModule } from './auth/auth.module';
 import { ConsultationModule } from './consultation/consultation.module';
 import { ContactsModule } from './contacts/contacts.module';
+import { AdmissionsModule } from './admissions/admissions.module';
+import { DiagnosesModule } from './diagnoses/diagnoses.module';
 import { InventoryModule } from './inventory/inventory.module';
 import { LabModule } from './lab/lab.module';
 import { NotificationsModule } from './notifications/notifications.module';
@@ -44,6 +46,8 @@ import { DocumentsModule } from './documents/documents.module';
     AnalyticsModule,
     TraigeModule,
     ConsultationModule,
+    DiagnosesModule,
+    AdmissionsModule,
     QueueModule,
     ContactsModule,
     OtpModule,

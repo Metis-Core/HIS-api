@@ -29,8 +29,13 @@ export function planDoctorRouting(
 ): PlannedStage[] {
   const isOpen = (intent: VisitIntenentsEnum) =>
     openDepartments.includes(intentDepartmentMap[intent]);
+  const admit =
+    requested.includes(VisitIntenentsEnum.ADMISSION) &&
+    !isOpen(VisitIntenentsEnum.ADMISSION);
   const unique = [...new Set(requested)].filter(
-    (intent) => intent !== VisitIntenentsEnum.BILLING,
+    (intent) =>
+      intent !== VisitIntenentsEnum.BILLING &&
+      intent !== VisitIntenentsEnum.ADMISSION,
   );
 
   const diagnostics = unique.filter(
@@ -54,5 +59,6 @@ export function planDoctorRouting(
   if (!awaitingResults && !isOpen(VisitIntenentsEnum.BILLING)) {
     plan.push({ intent: VisitIntenentsEnum.BILLING });
   }
-  return plan;
+  // D6: an admitted patient goes to the ward first; the rest of the plan follows from there.
+  return admit ? [{ intent: VisitIntenentsEnum.ADMISSION }, ...plan] : plan;
 }

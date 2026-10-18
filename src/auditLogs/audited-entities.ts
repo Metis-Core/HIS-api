@@ -1,3 +1,4 @@
+import { Admission } from 'src/admissions/entities/admission.entity';
 import { Patient } from 'src/patients/entities/patient.entity';
 import { Visit } from 'src/queue/entities/visit.entity';
 import { Service } from 'src/services/entities/service.entity';
@@ -9,4 +10,5 @@ export const AUDITED_ENTITIES = new Map<unknown, string>([
   [Visit, 'visit'],
   [User, 'user'],
   [Service, 'service'],
+  [Admission, 'admission'],
 ]);

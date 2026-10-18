@@ -13,4 +13,5 @@ export const intentDepartmentMap: Record<VisitIntenentsEnum, Department> = {
   [VisitIntenentsEnum.POSTOPERATIVE]: Department.INPATIENT_WARD,
   [VisitIntenentsEnum.FOLLOWUP]: Department.OUTPATIENT_CLINIC,
   [VisitIntenentsEnum.BILLING]: Department.FINANCE,
+  [VisitIntenentsEnum.ADMISSION]: Department.INPATIENT_WARD,
 };
