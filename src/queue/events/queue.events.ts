@@ -1,6 +1,4 @@
 import { Department } from 'common/enums/department.enum';
-import { QueueEntry } from 'src/queue/entities/queue-entry.entity';
-import { Visit } from 'src/queue/entities/visit.entity';
 import { QueueEntryStatus } from 'src/queue/enums/queue-entry-status.enum';
 
 export interface QueueEventData {
@@ -53,20 +51,3 @@ export class QueueEntrySkippedEvent extends QueueEvent {
 }
 
 export const QUEUE_EVENT_PATTERN = 'queue.entry.*';
-
-export function toQueueEventData(
-  entry: QueueEntry,
-  visit: Visit,
-): any {
-  // return {
-  //   entryId: entry.id,
-  //   visitId: visit.id,
-  //   patientId: visit.patientId,
-  //   department: entry.department,
-  //   // tokenNumber: visit.tokenNumber,
-  //   status: entry.status,
-  //   priority: entry.priority,
-  //   sequenceNumber: entry.sequenceNumber,
-  //   servedById: entry.servedById,
-  // };
-}
